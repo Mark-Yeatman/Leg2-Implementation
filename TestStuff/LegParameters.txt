@@ -1,0 +1,4 @@
+Mass = 6.09 Kg
+
+Ankle_to_Heel = 0.085 m  [Distance from the ankle axis of rotation to the ground (including a cosmetic foot shell) is 3.35 in (85mm).]
+Shank = 0.329 m 		 [Minimum shank length is 12.94 in (329mm) and can be increased by extending or switching the pylon. ]

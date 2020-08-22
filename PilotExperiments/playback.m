@@ -1,0 +1,39 @@
+% Runs the SLIP_KPBC data on time series data collected from Leg 2. For
+% debugging purposes
+
+%Set up outputs 
+Knee_torque_command = 0*time_in;
+Ankle_torque_command= 0*time_in;
+deltaL= 0*time_in;
+hip_pos= 0*time_in;
+Esys= 0*time_in;
+Esys_integrate_out= 0*time_in;
+U_LIN_SPRING_K= 0*time_in;
+U_LIN_SPRING_A= 0*time_in;
+U_LIN_DAMP_K= 0*time_in;
+U_LIN_DAMP_A= 0*time_in;
+U_STOP_K= 0*time_in;
+U_STOP_A= 0*time_in;
+U_PBC_K= 0*time_in;
+U_PBC_A= 0*time_in;
+knee_des_out= 0*time_in;
+ankle_des_out= 0*time_in;
+foot_contact= 0*time_in;
+stance= 0*time_in;
+phase_out= 0*time_in;
+IMU_LIVE_OUT= 0*time_in;
+for i = 1:length(time_in)
+    [Knee_torque_command(i), Ankle_torque_command(i), deltaL(i), hip_pos(i), Esys(i), Esys_integrate_out(i),...
+        U_LIN_SPRING_K(i), U_LIN_SPRING_A(i), U_LIN_DAMP_K(i), U_LIN_DAMP_A(i), U_STOP_K(i), U_STOP_A(i), U_PBC_K(i), U_PBC_A(i), ...
+        knee_des_out(i),ankle_des_out(i), foot_contact(i), stance(i), phase_out(i),IMU_LIVE_OUT(i)]...
+= SLIP_KPBC(IMU_pitch(i), knee_joint_pos(i), ankle_joint_pos(i), ...
+            time_in(i), dt(i), ...
+            load_cell_x_force(i), load_cell_y_force(i), load_cell_z_force(i), load_cell_x_moment(i), load_cell_y_moment(i), load_cell_z_moment(i),...
+            kp_knee(i), kd_knee(i), kp_ankle(i), kd_ankle(i), ankle_des_in(i), knee_des_in(i),...
+            vel_filter_coeff(i), IMU_filter_coeff(i),...
+            SLIP_ON(i), lt1(i), k(i), d(i), L0(i), ...
+            KPBC_ON(i), pbc_gain_ankle(i), pbc_gain_knee(i), M(i), Eref(i),...
+            knee_stop_low(i), knee_stop_high(i), ankle_stop_low(i), ankle_stop_high(i),...
+            max_torque(i),...
+            hip_thresh_st(i),hip_vel_thresh_st(i), F_thresh,Command_State(i), KPBC_max_torque(i), 1);
+end

@@ -1,0 +1,751 @@
+<!-- saved from url=(0014)about:internet -->
+<div class="dead">
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,1" id="srcline1">  1</a></span><span class="line">function [Knee_torque_command, Ankle_torque_command, deltaL, hip_pos, Esys, Esys_integrate_out,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,2" id="srcline2">  2</a></span><span class="line">        U_LIN_SPRING_K, U_LIN_SPRING_A, U_LIN_DAMP_K, U_LIN_DAMP_A, U_STOP_K, U_STOP_A, U_PBC_K,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,3" id="srcline3">  3</a></span><span class="line">        U_PBC_A, knee_des_out,ankle_des_out, foot_contact, stance, swing,phase_var_out,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,4" id="srcline4">  4</a></span><span class="line">        IMU_LIVE_OUT,StanceGain,SwingGain,knee_joint_vel,ankle_joint_vel,hip_vel,PushOffOut]...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,5" id="srcline5">  5</a></span><span class="line">= SLIP_KPBC(IMU_pitch, Knee_joint_position, Ankle_joint_position, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,6" id="srcline6">  6</a></span><span class="line">            time_in, dt, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,7" id="srcline7">  7</a></span><span class="line">            Load_cell_x_force, Load_cell_y_force, Load_cell_z_force, Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,8" id="srcline8">  8</a></span><span class="line">            kp_knee, kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,9" id="srcline9">  9</a></span><span class="line">            vel_filter_coeff, KPBC_filter_coeff,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,10" id="srcline10"> 10</a></span><span class="line">            SLIP_ON, lt, k, d, L0, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,11" id="srcline11"> 11</a></span><span class="line">            KPBC_ON, KPBC_max_torque_rate , pbc_gain_knee, M, Eref,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,12" id="srcline12"> 12</a></span><span class="line">            knee_stop_low, knee_stop_high, ankle_stop_low, ankle_stop_high,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,13" id="srcline13"> 13</a></span><span class="line">            max_torque,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,14" id="srcline14"> 14</a></span><span class="line">            k_tilde, Ignore_PushOff, F_thresh,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,15" id="srcline15"> 15</a></span><span class="line">            Command_State,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,16" id="srcline16"> 16</a></span><span class="line">            KPBC_max_torque, Joint_Bio_Sat)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,17" id="srcline17"> 17</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,18" id="srcline18"> 18</a></span><span class="line"><span class="comment">%Inputs in addition to sensors:</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,19" id="srcline19"> 19</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,20" id="srcline20"> 20</a></span><span class="line"><span class="comment">% Knee_joint_position, Ankle_joint_position are in degrees, in a</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,21" id="srcline21"> 21</a></span><span class="line"><span class="comment">% "biomechanics frame"</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,22" id="srcline22"> 22</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,23" id="srcline23"> 23</a></span><span class="line"><span class="comment">% t, dt, t_out are in seconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,24" id="srcline24"> 24</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,25" id="srcline25"> 25</a></span><span class="line">    <span class="comment">%% Persistent Variable Definitions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,26" id="srcline26"> 26</a></span><span class="line"><span class="comment">%Persistent variables used to store data between iterations</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,27" id="srcline27"> 27</a></span><span class="line">persistent hip_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,28" id="srcline28"> 28</a></span><span class="line">           knee_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,29" id="srcline29"> 29</a></span><span class="line">           ankle_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,30" id="srcline30"> 30</a></span><span class="line">           knee_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,31" id="srcline31"> 31</a></span><span class="line">           ankle_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,32" id="srcline32"> 32</a></span><span class="line">           hip_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,33" id="srcline33"> 33</a></span><span class="line">           IMU_pitch_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,34" id="srcline34"> 34</a></span><span class="line">           Esys_integrate...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,35" id="srcline35"> 35</a></span><span class="line">           t_switched_phase...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,36" id="srcline36"> 36</a></span><span class="line">           Stance...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,37" id="srcline37"> 37</a></span><span class="line">           Swing...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,38" id="srcline38"> 38</a></span><span class="line">           ForceCount...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,39" id="srcline39"> 39</a></span><span class="line">           Edis ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,40" id="srcline40"> 40</a></span><span class="line">           Hip_Pos_Max...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,41" id="srcline41"> 41</a></span><span class="line">           Hip_Pos_Min...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,42" id="srcline42"> 42</a></span><span class="line">           IMU_LIVE...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,43" id="srcline43"> 43</a></span><span class="line">           PushOff...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,44" id="srcline44"> 44</a></span><span class="line">           u_pbc_knee_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,45" id="srcline45"> 45</a></span><span class="line">           u_pbc_ankle_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,46" id="srcline46"> 46</a></span><span class="line">           <span class="comment">%t_switched_swing...<span class="comment"> %implement swing setpoint switching hold?</span></span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,47" id="srcline47"> 47</a></span><span class="line">       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,48" id="srcline48"> 48</a></span><span class="line">    if isempty(knee_pos_prev)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,49" id="srcline49"> 49</a></span><span class="line">        hip_pos_prev = IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,50" id="srcline50"> 50</a></span><span class="line">        knee_pos_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,51" id="srcline51"> 51</a></span><span class="line">        ankle_pos_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,52" id="srcline52"> 52</a></span><span class="line">        knee_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,53" id="srcline53"> 53</a></span><span class="line">        ankle_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,54" id="srcline54"> 54</a></span><span class="line">        hip_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,55" id="srcline55"> 55</a></span><span class="line">        IMU_pitch_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,56" id="srcline56"> 56</a></span><span class="line">        Esys_integrate  = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,57" id="srcline57"> 57</a></span><span class="line">        u_pbc_knee_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,58" id="srcline58"> 58</a></span><span class="line">        u_pbc_ankle_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,59" id="srcline59"> 59</a></span><span class="line">        t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,60" id="srcline60"> 60</a></span><span class="line">        <span class="comment">%t_switched_swing = time_in;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,61" id="srcline61"> 61</a></span><span class="line">        Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,62" id="srcline62"> 62</a></span><span class="line">        Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,63" id="srcline63"> 63</a></span><span class="line">        ForceCount = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,64" id="srcline64"> 64</a></span><span class="line">        Edis = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,65" id="srcline65"> 65</a></span><span class="line">        Hip_Pos_Max  = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,66" id="srcline66"> 66</a></span><span class="line">        Hip_Pos_Min = -20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,67" id="srcline67"> 67</a></span><span class="line">        IMU_LIVE = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,68" id="srcline68"> 68</a></span><span class="line">        PushOff = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,69" id="srcline69"> 69</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,70" id="srcline70"> 70</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,71" id="srcline71"> 71</a></span><span class="line">    <span class="comment">%% Initialization and Hard Coded Values</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,72" id="srcline72"> 72</a></span><span class="line">    <span class="comment">%Knee_torque_command = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,73" id="srcline73"> 73</a></span><span class="line">    <span class="comment">%Ankle_torque_command = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,74" id="srcline74"> 74</a></span><span class="line">    <span class="comment">%deltaL = single(0); %meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,75" id="srcline75"> 75</a></span><span class="line">    <span class="comment">%Esys = single(0); %Joules</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,76" id="srcline76"> 76</a></span><span class="line">    <span class="comment">%g = single(9.81); %m/s^2</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,77" id="srcline77"> 77</a></span><span class="line">    <span class="comment">%pulse_length = single(10); %seconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,78" id="srcline78"> 78</a></span><span class="line">    <span class="comment">%hip_pos = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,79" id="srcline79"> 79</a></span><span class="line">    <span class="comment">%t_out = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,80" id="srcline80"> 80</a></span><span class="line">    <span class="comment">%dt = 0;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,81" id="srcline81"> 81</a></span><span class="line">    Mt = M;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,82" id="srcline82"> 82</a></span><span class="line">    Ms = single(6.991429/2.205); <span class="comment">% converted to kg</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,83" id="srcline83"> 83</a></span><span class="line">    Mf = single(0.55 + 1.643130/2.205); <span class="comment">%carbon fiber foot + mechanism, kg</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,84" id="srcline84"> 84</a></span><span class="line">    <span class="comment">%lt = single(0.3733); %meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,85" id="srcline85"> 85</a></span><span class="line">    ls = single(0.3733); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,86" id="srcline86"> 86</a></span><span class="line">    la = single(0.0628); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,87" id="srcline87"> 87</a></span><span class="line">    lf = single(0.15); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,88" id="srcline88"> 88</a></span><span class="line">    px = single(0); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,89" id="srcline89"> 89</a></span><span class="line">    py = single(0); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,90" id="srcline90"> 90</a></span><span class="line">    params = [Mt, Ms, Mf, lt, ls, la, lf, px, py]; <span class="comment">%From ordering in makeMatlabFunctionsProthesisTestBench</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,91" id="srcline91"> 91</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,92" id="srcline92"> 92</a></span><span class="line">    Knee_torque_command= single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,93" id="srcline93"> 93</a></span><span class="line">    Ankle_torque_command = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,94" id="srcline94"> 94</a></span><span class="line">    knee_des_out = nan;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,95" id="srcline95"> 95</a></span><span class="line">    ankle_des_out = nan;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,96" id="srcline96"> 96</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,97" id="srcline97"> 97</a></span><span class="line">    U_LIN_DAMP_K = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,98" id="srcline98"> 98</a></span><span class="line">    U_LIN_DAMP_A = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,99" id="srcline99"> 99</a></span><span class="line">    U_LIN_SPRING_K = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,100" id="srcline100">100</a></span><span class="line">    U_LIN_SPRING_A = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,101" id="srcline101">101</a></span><span class="line">    U_PBC_K = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,102" id="srcline102">102</a></span><span class="line">    U_PBC_A = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,103" id="srcline103">103</a></span><span class="line">    phase_var_out = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,104" id="srcline104">104</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,105" id="srcline105">105</a></span><span class="line">    <span class="comment">% Position/velocity hard limits</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,106" id="srcline106">106</a></span><span class="line">    ANKLE_POS_MIN_LIM  = -35;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,107" id="srcline107">107</a></span><span class="line">    ANKLE_POS_MAX_LIM = 35;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,108" id="srcline108">108</a></span><span class="line">    ANKLE_VEL_MIN_LIM = -200; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,109" id="srcline109">109</a></span><span class="line">    ANKLE_VEL_MAX_LIM = 200; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,110" id="srcline110">110</a></span><span class="line">    KNEE_POS_MIN_LIM = 2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,111" id="srcline111">111</a></span><span class="line">    KNEE_POS_MAX_LIM = 105;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,112" id="srcline112">112</a></span><span class="line">    KNEE_VEL_MIN_LIM = -400; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,113" id="srcline113">113</a></span><span class="line">    KNEE_VEL_MAX_LIM = 400; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,114" id="srcline114">114</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,115" id="srcline115">115</a></span><span class="line">    Edismax = 50; <span class="comment">%joules</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,116" id="srcline116">116</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,117" id="srcline117">117</a></span><span class="line">    <span class="comment">%Winters Data Arrays</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,118" id="srcline118">118</a></span><span class="line">    a_knee=[-21.9472500000000,4.24525000000000,21.6720000000000,0;20.9295000000000,-6.97650000000000,7.71900000000000,0;15.9362500000000,-0.998250000000000,18.6640000000000,25.8830000000000;-59.8412500000000,13.6422500000000,64.8630000000000,0;-19.4405000000000,-1.40250000000000,38.4100000000000,-47.2960000000000;45.1070000000000,-7.15300000000000,0.456000000000000,0;1.42525000000000,0.0657500000000000,2.21000000000000,3.24500000000000];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,119" id="srcline119">119</a></span><span class="line">    a_ankle=[5.50050000000000,-0.880500000000000,-4.60000000000000,0;-8.98500000000000,3.77020000000000,5.26600000000000,4.65120000000000;0.812500000000000,-0.475000000000000,7.74100000000000,2.81250000000000;-2.19975000000000,0.320750000000000,9.62000000000000,0;-14.7575000000000,0.878500000000001,-0.745000000000000,-24.2440000000000;23.0932000000000,-3.91420000000000,-19.9240000000000,0;-29.8020000000000,9.93400000000000,-0.0560000000000000,0;0.703500000000000,-0.234500000000000,-0.525000000000000,0;-2.60850000000000,0.869500000000000,1.21400000000000,0;-0.729000000000000,0.0190000000000000,0.580000000000000,-1.34400000000000];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,120" id="srcline120">120</a></span><span class="line">    knee_ind=[1 139 400 530 720 848 976 1001];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,121" id="srcline121">121</a></span><span class="line">    ankle_ind=[1 61 205 330 440 550 653 846 898 977 1001];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,122" id="srcline122">122</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,123" id="srcline123">123</a></span><span class="line">    <span class="comment">%% State Calculations</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,124" id="srcline124">124</a></span><span class="line">    <span class="comment">%Assign joint positions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,125" id="srcline125">125</a></span><span class="line">    hip_pos = IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,126" id="srcline126">126</a></span><span class="line">    knee_pos =  Knee_joint_position; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,127" id="srcline127">127</a></span><span class="line">    ankle_pos = Ankle_joint_position;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,128" id="srcline128">128</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,129" id="srcline129">129</a></span><span class="line">    <span class="comment">%Calculate joint velocities usindg exponential smoothing filter</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,130" id="srcline130">130</a></span><span class="line">    <span class="comment">%https://en.wikipedia.org/wiki/Exponential_smoothing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,131" id="srcline131">131</a></span><span class="line">    hip_vel = (1-vel_filter_coeff)*hip_vel_prev + vel_filter_coeff*(hip_pos-hip_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,132" id="srcline132">132</a></span><span class="line">    knee_vel = (1-vel_filter_coeff)*knee_vel_prev + vel_filter_coeff*(knee_pos-knee_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,133" id="srcline133">133</a></span><span class="line">    ankle_vel = (1-vel_filter_coeff)*ankle_vel_prev + vel_filter_coeff*(ankle_pos-ankle_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,134" id="srcline134">134</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,135" id="srcline135">135</a></span><span class="line">    <span class="comment">%Human Leg as a Robot states</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,136" id="srcline136">136</a></span><span class="line">    x = zeros(10,1); <span class="comment">%x,y,-knee ankle, ankle angle</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,137" id="srcline137">137</a></span><span class="line">    x(4) =  -knee_pos; <span class="comment">%reverse knee sign convention of biomechanics versus biped modeling     </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,138" id="srcline138">138</a></span><span class="line">    x(5) =  ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,139" id="srcline139">139</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,140" id="srcline140">140</a></span><span class="line">    x(9) =  -knee_vel; <span class="comment">%reverse knee sign convention of biomechanics versus biped modeling</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,141" id="srcline141">141</a></span><span class="line">    x(10) =  ankle_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,142" id="srcline142">142</a></span><span class="line">   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,143" id="srcline143">143</a></span><span class="line">    <span class="comment">%Virtual linear spring from hip to foot, l1 is shank length, l2 is thigh length     </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,144" id="srcline144">144</a></span><span class="line">    J = Spring_Jacobian_func(x,params);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,145" id="srcline145">145</a></span><span class="line">    L = Spring_Length_func(x,params);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,146" id="srcline146">146</a></span><span class="line">    deltaL = L - L0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,147" id="srcline147">147</a></span><span class="line">    Ldot = Spring_vel_func(x,params);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,148" id="srcline148">148</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,149" id="srcline149">149</a></span><span class="line">    <span class="comment">%Calculate system energy</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,150" id="srcline150">150</a></span><span class="line">    <span class="comment">%Ehip = 1/2*M*(Ldot^2) + (L-L0)*M*g; %kinetic and potential energy of slip model</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,151" id="srcline151">151</a></span><span class="line">    Espring = 1/2*k_tilde*deltaL^2; <span class="comment">%virtual spring potential energy</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,152" id="srcline152">152</a></span><span class="line">    KE = 1/2*M*(Ldot^2);<span class="comment">%KE_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,153" id="srcline153">153</a></span><span class="line">    <span class="comment">%PE = PE_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,154" id="srcline154">154</a></span><span class="line">    Esys = Espring + KE;<span class="comment">%Espring + PE + KE;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,155" id="srcline155">155</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,156" id="srcline156">156</a></span><span class="line">    <span class="comment">%Phase Variable </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,157" id="srcline157">157</a></span><span class="line">    <span class="comment">%s_a=clamp(1+(1-s_m)/(q_h_0-q_h_m)*(hip-q_h_0),0,1);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,158" id="srcline158">158</a></span><span class="line">    phase_var_out =  0.6 + 0.4*(hip_pos-Hip_Pos_Min)/(Hip_Pos_Max-Hip_Pos_Min);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,159" id="srcline159">159</a></span><span class="line">    phase_var_out = clamp(phase_var_out,0.6,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,160" id="srcline160">160</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,161" id="srcline161">161</a></span><span class="line">    <span class="comment">%IMU State check</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,162" id="srcline162">162</a></span><span class="line">    IMU_LIVE = abs(hip_pos_prev-hip_pos)&lt;1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,163" id="srcline163">163</a></span><span class="line">   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,164" id="srcline164">164</a></span><span class="line">    <span class="comment">%PushOff = and(or((hip_pos &lt; hip_thresh_st),PushOff),Stance); %PushOff is persistent, so this remembers when the hip_pos crosses and stays high until Stance is off</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,165" id="srcline165">165</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,166" id="srcline166">166</a></span><span class="line">    <span class="comment">%% Control logic</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,167" id="srcline167">167</a></span><span class="line">    <span class="comment">%Determine foot contact</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,168" id="srcline168">168</a></span><span class="line">    if norm([Load_cell_x_force, Load_cell_y_force, Load_cell_z_force],2) &gt; F_thresh</span></span>
+<span class="srcline"><span class="lineno"><a href="1,169" id="srcline169">169</a></span><span class="line">        ForceCount = ForceCount+1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,170" id="srcline170">170</a></span><span class="line">        if ForceCount &gt; 2</span></span>
+<span class="srcline"><span class="lineno"><a href="1,171" id="srcline171">171</a></span><span class="line">            FootContact = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,172" id="srcline172">172</a></span><span class="line">        else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,173" id="srcline173">173</a></span><span class="line">            FootContact = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,174" id="srcline174">174</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,175" id="srcline175">175</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,176" id="srcline176">176</a></span><span class="line">        FootContact = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,177" id="srcline177">177</a></span><span class="line">        ForceCount = 0;   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,178" id="srcline178">178</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,179" id="srcline179">179</a></span><span class="line">             </span></span>
+<span class="srcline"><span class="lineno"><a href="1,180" id="srcline180">180</a></span><span class="line">    StanceGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,181" id="srcline181">181</a></span><span class="line">    SwingGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,182" id="srcline182">182</a></span><span class="line">    t_hold = 0.3;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,183" id="srcline183">183</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,184" id="srcline184">184</a></span><span class="line">    <span class="comment">%Phase State management, set autodetection or command stance/swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,185" id="srcline185">185</a></span><span class="line">    if int8(Command_State) == int8(0)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,186" id="srcline186">186</a></span><span class="line">        <span class="comment">%Determine stance vs swing, only allow phase state switching every t_hold seconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,187" id="srcline187">187</a></span><span class="line">        if Stance &amp;&amp; ~FootContact <span class="comment">%The state needs to be switched</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,188" id="srcline188">188</a></span><span class="line">            if t_hold &lt; (time_in - t_switched_phase) <span class="comment">%Check the last time we switched, if its too fast, wait</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,189" id="srcline189">189</a></span><span class="line">               <span class="comment">%Switch to SWING</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,190" id="srcline190">190</a></span><span class="line">               t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,191" id="srcline191">191</a></span><span class="line">               Swing = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,192" id="srcline192">192</a></span><span class="line">               Stance = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,193" id="srcline193">193</a></span><span class="line">               <span class="comment">%reset the energy intergration variables</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,194" id="srcline194">194</a></span><span class="line">               <span class="comment">%Esys_integrate = 0;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,195" id="srcline195">195</a></span><span class="line">               <span class="comment">%Edis = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,196" id="srcline196">196</a></span><span class="line">               u_pbc_knee_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,197" id="srcline197">197</a></span><span class="line">               u_pbc_ankle_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,198" id="srcline198">198</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,199" id="srcline199">199</a></span><span class="line">        elseif Swing &amp;&amp; FootContact <span class="comment">%ditto, but for the other case</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,200" id="srcline200">200</a></span><span class="line">            if t_hold &lt; (time_in - t_switched_phase) </span></span>
+<span class="srcline"><span class="lineno"><a href="1,201" id="srcline201">201</a></span><span class="line">                <span class="comment">%Switch to STANCE</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,202" id="srcline202">202</a></span><span class="line">                t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,203" id="srcline203">203</a></span><span class="line">                Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,204" id="srcline204">204</a></span><span class="line">                Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,205" id="srcline205">205</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,206" id="srcline206">206</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,207" id="srcline207">207</a></span><span class="line">        <span class="comment">%Manage torque smoothing when switching phases</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,208" id="srcline208">208</a></span><span class="line">        if Stance</span></span>
+<span class="srcline"><span class="lineno"><a href="1,209" id="srcline209">209</a></span><span class="line">            t_norm = (time_in - t_switched_phase)/(t_hold*0.8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,210" id="srcline210">210</a></span><span class="line">            StanceGain = min(t_norm,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,211" id="srcline211">211</a></span><span class="line">            SwingGain = 1-StanceGain; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,212" id="srcline212">212</a></span><span class="line">        elseif Swing</span></span>
+<span class="srcline"><span class="lineno"><a href="1,213" id="srcline213">213</a></span><span class="line">            t_norm = (time_in - t_switched_phase)/(t_hold*0.8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,214" id="srcline214">214</a></span><span class="line">            SwingGain = min(t_norm,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,215" id="srcline215">215</a></span><span class="line">            StanceGain = 1-SwingGain; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,216" id="srcline216">216</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,217" id="srcline217">217</a></span><span class="line">    elseif int8(Command_State) == int8(1) <span class="comment">%Stance</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,218" id="srcline218">218</a></span><span class="line">        Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,219" id="srcline219">219</a></span><span class="line">        Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,220" id="srcline220">220</a></span><span class="line">        Hip_Pos_Max = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,221" id="srcline221">221</a></span><span class="line">        Hip_Pos_Min = - 20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,222" id="srcline222">222</a></span><span class="line">        StanceGain = 1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,223" id="srcline223">223</a></span><span class="line">        SwingGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,224" id="srcline224">224</a></span><span class="line">    elseif int8(Command_State) == int8(2) <span class="comment">%Swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,225" id="srcline225">225</a></span><span class="line">        Stance = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,226" id="srcline226">226</a></span><span class="line">        Swing = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,227" id="srcline227">227</a></span><span class="line">        Hip_Pos_Max = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,228" id="srcline228">228</a></span><span class="line">        Hip_Pos_Min = - 20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,229" id="srcline229">229</a></span><span class="line">        StanceGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,230" id="srcline230">230</a></span><span class="line">        SwingGain = 1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,231" id="srcline231">231</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,232" id="srcline232">232</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,233" id="srcline233">233</a></span><span class="line">    <span class="comment">%Torque computation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,234" id="srcline234">234</a></span><span class="line">    if SLIP_ON       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,235" id="srcline235">235</a></span><span class="line">        Knee_torque_command_stance = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,236" id="srcline236">236</a></span><span class="line">        Ankle_torque_command_stance = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,237" id="srcline237">237</a></span><span class="line">        <span class="comment">%% Stance                </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,238" id="srcline238">238</a></span><span class="line">        <span class="comment">%Virtual linear spring</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,239" id="srcline239">239</a></span><span class="line">        u_lin_spring = -k.*(deltaL).*J;     </span></span>
+<span class="srcline"><span class="lineno"><a href="1,240" id="srcline240">240</a></span><span class="line">        u_lin_damp = -d.*(Ldot).*J;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,241" id="srcline241">241</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,242" id="srcline242">242</a></span><span class="line">        U_LIN_DAMP_K = -u_lin_damp(4);<span class="comment">% -u_G_shape(4);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,243" id="srcline243">243</a></span><span class="line">        U_LIN_DAMP_A = u_lin_damp(5);<span class="comment">% u_G_shape(5);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,244" id="srcline244">244</a></span><span class="line">        U_LIN_SPRING_K = -u_lin_spring(4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,245" id="srcline245">245</a></span><span class="line">        U_LIN_SPRING_A = u_lin_spring(5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,246" id="srcline246">246</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,247" id="srcline247">247</a></span><span class="line">        Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; <span class="comment">%reverse knee sign convention of biomechanics versus biped modeling</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,248" id="srcline248">248</a></span><span class="line">        Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,249" id="srcline249">249</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,250" id="srcline250">250</a></span><span class="line">        <span class="comment">%estimate how much energy the virtual linear damper is dissipating, to be added back in during pushoff</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,251" id="srcline251">251</a></span><span class="line"><span class="comment">%         if ~PushOff</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,252" id="srcline252">252</a></span><span class="line"><span class="comment">%             Edis = Edis  + (knee_vel*u_lin_damp(4) + ankle_vel*u_lin_damp(5))*dt;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,253" id="srcline253">253</a></span><span class="line"><span class="comment">%         end</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,254" id="srcline254">254</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,255" id="srcline255">255</a></span><span class="line">        if KPBC_ON <span class="comment">%Also use energy tracking controller   </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,256" id="srcline256">256</a></span><span class="line">            u_pbc = single(zeros(5,1));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,257" id="srcline257">257</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,258" id="srcline258">258</a></span><span class="line"><span class="comment">%             if Joint_Bio_Sat </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,259" id="srcline259">259</a></span><span class="line"><span class="comment">%                 %Joint level KPBC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,260" id="srcline260">260</a></span><span class="line"><span class="comment">%                 u_pbc(4) = -pbc_gain_knee * knee_vel * (Esys_integrate - Eref - max(Edis,Edismax));</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,261" id="srcline261">261</a></span><span class="line"><span class="comment">%                 u_pbc(5) = -pbc_gain_ankle * ankle_vel * (Esys_integrate - Eref - max(Edis,Edismax));</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,262" id="srcline262">262</a></span><span class="line"><span class="comment">%                 </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,263" id="srcline263">263</a></span><span class="line"><span class="comment">%                 U_PBC_K = u_pbc(4); %THE SIGN NEEDS TO BE CHANGED IF USING SPRING VERSUS JOINT LEVEL BECAUSE OF BIO VS ROBOT KNEE CORDS</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,264" id="srcline264">264</a></span><span class="line"><span class="comment">%                 U_PBC_A = u_pbc(5);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,265" id="srcline265">265</a></span><span class="line"><span class="comment">%                 </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,266" id="srcline266">266</a></span><span class="line"><span class="comment">%             else</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,267" id="srcline267">267</a></span><span class="line">                <span class="comment">%KPBC along spring axis</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,268" id="srcline268">268</a></span><span class="line">                u_pbc  = -J*pbc_gain_knee*(Esys - Eref)*Ldot; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,269" id="srcline269">269</a></span><span class="line">                </span></span>
+<span class="srcline"><span class="lineno"><a href="1,270" id="srcline270">270</a></span><span class="line">                U_PBC_K = -u_pbc(4); <span class="comment">%THE SIGN NEEDS TO BE CHANGED IF USING SPRING VERSUS JOINT LEVEL BECAUSE OF BIO VS ROBOT KNEE CORDS</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,271" id="srcline271">271</a></span><span class="line">                U_PBC_A = u_pbc(5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,272" id="srcline272">272</a></span><span class="line">                </span></span>
+<span class="srcline"><span class="lineno"><a href="1,273" id="srcline273">273</a></span><span class="line">            <span class="comment">%end</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,274" id="srcline274">274</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,275" id="srcline275">275</a></span><span class="line">            <span class="comment">%moving average filter and saturation laws on value and rate of</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,276" id="srcline276">276</a></span><span class="line">            <span class="comment">%torque</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,277" id="srcline277">277</a></span><span class="line">         </span></span>
+<span class="srcline"><span class="lineno"><a href="1,278" id="srcline278">278</a></span><span class="line">            <span class="comment">%Absolute saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,279" id="srcline279">279</a></span><span class="line">            if KPBC_max_torque&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,280" id="srcline280">280</a></span><span class="line">                U_PBC_K = Saturate(U_PBC_K,-KPBC_max_torque,KPBC_max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,281" id="srcline281">281</a></span><span class="line">                U_PBC_A = Saturate(U_PBC_A,-KPBC_max_torque,KPBC_max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,282" id="srcline282">282</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,283" id="srcline283">283</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,284" id="srcline284">284</a></span><span class="line">            <span class="comment">%Rate saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,285" id="srcline285">285</a></span><span class="line">            if KPBC_max_torque_rate&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,286" id="srcline286">286</a></span><span class="line">                dk = (U_PBC_K-u_pbc_knee_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,287" id="srcline287">287</a></span><span class="line">                da = (U_PBC_A-u_pbc_ankle_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,288" id="srcline288">288</a></span><span class="line">                dk = Saturate(dk, -KPBC_max_torque_rate, KPBC_max_torque_rate);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,289" id="srcline289">289</a></span><span class="line">                da = Saturate(da, -KPBC_max_torque_rate, KPBC_max_torque_rate);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,290" id="srcline290">290</a></span><span class="line">                U_PBC_K = dk*dt+u_pbc_knee_prev;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,291" id="srcline291">291</a></span><span class="line">                U_PBC_A = da*dt+u_pbc_ankle_prev;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,292" id="srcline292">292</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,293" id="srcline293">293</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,294" id="srcline294">294</a></span><span class="line">            <span class="comment">%exponential smoothing of torque</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,295" id="srcline295">295</a></span><span class="line">            U_PBC_K = (1-KPBC_filter_coeff)*u_pbc_knee_prev + KPBC_filter_coeff*U_PBC_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,296" id="srcline296">296</a></span><span class="line">            U_PBC_A = (1-KPBC_filter_coeff)*u_pbc_ankle_prev + KPBC_filter_coeff*U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,297" id="srcline297">297</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,298" id="srcline298">298</a></span><span class="line">            if Joint_Bio_Sat </span></span>
+<span class="srcline"><span class="lineno"><a href="1,299" id="srcline299">299</a></span><span class="line">                <span class="comment">%Biomemetic power saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,300" id="srcline300">300</a></span><span class="line">                Pow_Knee = knee_vel*U_PBC_K ;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,301" id="srcline301">301</a></span><span class="line">                Pow_Ankle = ankle_vel*U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,302" id="srcline302">302</a></span><span class="line">                if sign(Pow_Ankle) == -1</span></span>
+<span class="srcline"><span class="lineno"><a href="1,303" id="srcline303">303</a></span><span class="line">                    U_PBC_A = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,304" id="srcline304">304</a></span><span class="line">                end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,305" id="srcline305">305</a></span><span class="line">                if sign(Pow_Knee) == 1</span></span>
+<span class="srcline"><span class="lineno"><a href="1,306" id="srcline306">306</a></span><span class="line">                    U_PBC_K = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,307" id="srcline307">307</a></span><span class="line">                end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,308" id="srcline308">308</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,309" id="srcline309">309</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,310" id="srcline310">310</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,311" id="srcline311">311</a></span><span class="line">            <span class="comment">%Use energy intergration scheme  </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,312" id="srcline312">312</a></span><span class="line">            <span class="comment">%Esys_integrate = Esys_integrate  + (knee_vel*U_PBC_K + ankle_vel*U_PBC_A)*dt;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,313" id="srcline313">313</a></span><span class="line">                     </span></span>
+<span class="srcline"><span class="lineno"><a href="1,314" id="srcline314">314</a></span><span class="line">            <span class="comment">%cancel damping term during KPBC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,315" id="srcline315">315</a></span><span class="line">            Knee_torque_command_stance = Knee_torque_command_stance + U_PBC_K - U_LIN_DAMP_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,316" id="srcline316">316</a></span><span class="line">            Ankle_torque_command_stance = Ankle_torque_command_stance + U_PBC_A - U_LIN_DAMP_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,317" id="srcline317">317</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,318" id="srcline318">318</a></span><span class="line">        <span class="comment">%% Swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,319" id="srcline319">319</a></span><span class="line">        if IMU_LIVE</span></span>
+<span class="srcline"><span class="lineno"><a href="1,320" id="srcline320">320</a></span><span class="line">            <span class="comment">%Use hip pos as phase variable to index winters data</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,321" id="srcline321">321</a></span><span class="line">            [knee_des_out ,~,ankle_des_out,~]=winterFit(phase_var_out*1000,a_knee,a_ankle,knee_ind,ankle_ind);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,322" id="srcline322">322</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,323" id="srcline323">323</a></span><span class="line">            <span class="comment">%follow the trjactory via PD controller</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,324" id="srcline324">324</a></span><span class="line">            [Knee_torque_command_swing,Ankle_torque_command_swing] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,325" id="srcline325">325</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,326" id="srcline326">326</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,327" id="srcline327">327</a></span><span class="line">       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,328" id="srcline328">328</a></span><span class="line">        else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,329" id="srcline329">329</a></span><span class="line">            knee_des_out = knee_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,330" id="srcline330">330</a></span><span class="line">            ankle_des_out = ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,331" id="srcline331">331</a></span><span class="line">            [Knee_torque_command_swing,Ankle_torque_command_swing] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,332" id="srcline332">332</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,333" id="srcline333">333</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,334" id="srcline334">334</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,335" id="srcline335">335</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,336" id="srcline336">336</a></span><span class="line">        <span class="comment">%Smooth between stance and swing torques</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,337" id="srcline337">337</a></span><span class="line">        Knee_torque_command = StanceGain*Knee_torque_command_stance + SwingGain*Knee_torque_command_swing;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,338" id="srcline338">338</a></span><span class="line">        Ankle_torque_command = StanceGain*Ankle_torque_command_stance + SwingGain*Ankle_torque_command_swing;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,339" id="srcline339">339</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,340" id="srcline340">340</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,341" id="srcline341">341</a></span><span class="line">        IMU_LIVE = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,342" id="srcline342">342</a></span><span class="line">        <span class="comment">%Use Setpoint PD control</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,343" id="srcline343">343</a></span><span class="line">        knee_des_out = knee_des_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,344" id="srcline344">344</a></span><span class="line">        ankle_des_out = ankle_des_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,345" id="srcline345">345</a></span><span class="line">        [Knee_torque_command,Ankle_torque_command] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,346" id="srcline346">346</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,347" id="srcline347">347</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,348" id="srcline348">348</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,349" id="srcline349">349</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,350" id="srcline350">350</a></span><span class="line">    <span class="comment">%% Virtual hard stops</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,351" id="srcline351">351</a></span><span class="line">    u_stop = zeros(2,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,352" id="srcline352">352</a></span><span class="line">    if knee_stop_low &lt; knee_stop_high &amp;&amp; ankle_stop_low &lt; ankle_stop_high</span></span>
+<span class="srcline"><span class="lineno"><a href="1,353" id="srcline353">353</a></span><span class="line">        knee_limits = [knee_stop_low, knee_stop_high];  <span class="comment">%deg, need to make sure its ordered</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,354" id="srcline354">354</a></span><span class="line">        ankle_limits = [ankle_stop_low, ankle_stop_high];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,355" id="srcline355">355</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,356" id="srcline356">356</a></span><span class="line">        knee_limits = single([KNEE_POS_MIN_LIM, KNEE_POS_MAX_LIM]);  <span class="comment">%deg, need to make sure its ordered</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,357" id="srcline357">357</a></span><span class="line">        ankle_limits = single([ANKLE_POS_MIN_LIM, ANKLE_POS_MAX_LIM]);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,358" id="srcline358">358</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,359" id="srcline359">359</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,360" id="srcline360">360</a></span><span class="line">    if knee_pos &lt; knee_limits(1)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,361" id="srcline361">361</a></span><span class="line">        u_stop(1) = -kp_knee*(knee_pos - knee_limits(1)) - kd_knee*(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,362" id="srcline362">362</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,363" id="srcline363">363</a></span><span class="line">    if knee_limits(2) &lt; knee_pos </span></span>
+<span class="srcline"><span class="lineno"><a href="1,364" id="srcline364">364</a></span><span class="line">        u_stop(1) = -kp_knee*(knee_pos - knee_limits(2)) - kd_knee*(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,365" id="srcline365">365</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,366" id="srcline366">366</a></span><span class="line">    if ankle_pos &lt; ankle_limits(1)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,367" id="srcline367">367</a></span><span class="line">        u_stop(2) = -kp_ankle*(ankle_pos - ankle_limits(1)) - kd_ankle*(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,368" id="srcline368">368</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,369" id="srcline369">369</a></span><span class="line">    if ankle_limits(2) &lt; ankle_pos</span></span>
+<span class="srcline"><span class="lineno"><a href="1,370" id="srcline370">370</a></span><span class="line">        u_stop(2) = -kp_ankle*(ankle_pos - ankle_limits(2)) - kd_ankle*(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,371" id="srcline371">371</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,372" id="srcline372">372</a></span><span class="line">    U_STOP_K = u_stop(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,373" id="srcline373">373</a></span><span class="line">    U_STOP_A = u_stop(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,374" id="srcline374">374</a></span><span class="line">    Knee_torque_command = Knee_torque_command + u_stop(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,375" id="srcline375">375</a></span><span class="line">    Ankle_torque_command = Ankle_torque_command + u_stop(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,376" id="srcline376">376</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,377" id="srcline377">377</a></span><span class="line">    <span class="comment">%% Saturate torque output</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,378" id="srcline378">378</a></span><span class="line">    if max_torque&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,379" id="srcline379">379</a></span><span class="line">        Knee_torque_command = Saturate(Knee_torque_command,-max_torque,max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,380" id="srcline380">380</a></span><span class="line">        Ankle_torque_command = Saturate(Ankle_torque_command,-max_torque,max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,381" id="srcline381">381</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,382" id="srcline382">382</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,383" id="srcline383">383</a></span><span class="line">    <span class="comment">%% Persistent/output variable management</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,384" id="srcline384">384</a></span><span class="line">    Esys_integrate_out = Esys_integrate;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,385" id="srcline385">385</a></span><span class="line">    knee_pos_prev = knee_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,386" id="srcline386">386</a></span><span class="line">    ankle_pos_prev = ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,387" id="srcline387">387</a></span><span class="line">    knee_vel_prev=knee_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,388" id="srcline388">388</a></span><span class="line">    ankle_vel_prev=ankle_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,389" id="srcline389">389</a></span><span class="line">    IMU_pitch_prev=IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,390" id="srcline390">390</a></span><span class="line">    hip_vel_prev = hip_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,391" id="srcline391">391</a></span><span class="line">    hip_pos_prev = hip_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,392" id="srcline392">392</a></span><span class="line">    u_pbc_knee_prev = U_PBC_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,393" id="srcline393">393</a></span><span class="line">    u_pbc_ankle_prev = U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,394" id="srcline394">394</a></span><span class="line">    knee_joint_vel = single(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,395" id="srcline395">395</a></span><span class="line">    ankle_joint_vel = single(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,396" id="srcline396">396</a></span><span class="line">    foot_contact = single(FootContact);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,397" id="srcline397">397</a></span><span class="line">    stance = single(Stance);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,398" id="srcline398">398</a></span><span class="line">    swing = single(Swing);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,399" id="srcline399">399</a></span><span class="line">    IMU_LIVE_OUT = single(IMU_LIVE);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,400" id="srcline400">400</a></span><span class="line">    PushOffOut = single(PushOff);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,401" id="srcline401">401</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,402" id="srcline402">402</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,403" id="srcline403">403</a></span><span class="line"><span class="comment">%% Helper functions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,404" id="srcline404">404</a></span><span class="line">function [Knee_torque_command,Ankle_torque_command] = PDControl(kp_k, kd_k, q_kstar, q_k, qdot_k, kp_a, kd_a, q_astar, q_a, qdot_a)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,405" id="srcline405">405</a></span><span class="line">    <span class="comment">%This control basically assumes that the desired joint angles are static i.e., the desired velocities are all zero.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,406" id="srcline406">406</a></span><span class="line">    Knee_torque_command = kp_k*(q_kstar - q_k) + kd_k*(-qdot_k);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,407" id="srcline407">407</a></span><span class="line">    Ankle_torque_command = kp_a*(q_astar - q_a) + kd_a*(-qdot_a);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,408" id="srcline408">408</a></span><span class="line">end</span></span>
+</pre>
+</div>
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,409" id="srcline409">409</a></span><span class="line"><span class="keyword">function</span> <span class="var type1" id="S169T1U1656">l1dot</span> = Spring_vel_func(<span class="var type1" id="S170T9U1659">in1</span>,<span class="var type1" id="S171T3U1660">in2</span>)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,410" id="srcline410">410</a></span><span class="line"><span class="comment">%SPRING_VEL_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,411" id="srcline411">411</a></span><span class="line"><span class="comment">%    L1DOT = SPRING_VEL_FUNC(IN1,IN2)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,412" id="srcline412">412</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,413" id="srcline413">413</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,414" id="srcline414">414</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:44</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,415" id="srcline415">415</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,416" id="srcline416">416</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,417" id="srcline417">417</a></span><span class="line"><span class="mxinfo " id="T1:U4"><span class="var type1" id="S172T1U1663">la</span> = <span class="mxinfo " id="T1:U6"><span class="var type1" id="S171T3U1665">in2</span>(<span class="mxinfo " id="T10:U8">:</span>,<span class="mxinfo " id="T10:U9">6</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,418" id="srcline418">418</a></span><span class="line"><span class="mxinfo " id="T1:U10"><span class="var type1" id="S173T1U1670">lf</span> = <span class="mxinfo " id="T1:U12"><span class="var type1" id="S171T3U1672">in2</span>(<span class="mxinfo " id="T10:U14">:</span>,<span class="mxinfo " id="T10:U15">7</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,419" id="srcline419">419</a></span><span class="line"><span class="mxinfo " id="T1:U16"><span class="var type1" id="S174T1U1677">ls</span> = <span class="mxinfo " id="T1:U18"><span class="var type1" id="S171T3U1679">in2</span>(<span class="mxinfo " id="T10:U20">:</span>,<span class="mxinfo " id="T10:U21">5</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,420" id="srcline420">420</a></span><span class="line"><span class="mxinfo " id="T1:U22"><span class="var type1" id="S175T1U1684">lt</span> = <span class="mxinfo " id="T1:U24"><span class="var type1" id="S171T3U1686">in2</span>(<span class="mxinfo " id="T10:U26">:</span>,<span class="mxinfo " id="T10:U27">4</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,421" id="srcline421">421</a></span><span class="line"><span class="mxinfo " id="T1:U28"><span class="var type1" id="S176T1U1691">px</span> = <span class="mxinfo " id="T1:U30"><span class="var type1" id="S171T3U1693">in2</span>(<span class="mxinfo " id="T10:U32">:</span>,<span class="mxinfo " id="T10:U33">8</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,422" id="srcline422">422</a></span><span class="line"><span class="mxinfo " id="T1:U34"><span class="var type1" id="S177T1U1698">py</span> = <span class="mxinfo " id="T1:U36"><span class="var type1" id="S171T3U1700">in2</span>(<span class="mxinfo " id="T10:U38">:</span>,<span class="mxinfo " id="T10:U39">9</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,423" id="srcline423">423</a></span><span class="line"><span class="mxinfo " id="T1:U40"><span class="var type1" id="S178T1U1705">x3</span> = <span class="mxinfo " id="T1:U42"><span class="var type1" id="S170T9U1707">in1</span>(<span class="mxinfo " id="T10:U44">3</span>,<span class="mxinfo " id="T10:U45">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,424" id="srcline424">424</a></span><span class="line"><span class="mxinfo " id="T1:U46"><span class="var type1" id="S179T1U1712">x4</span> = <span class="mxinfo " id="T1:U48"><span class="var type1" id="S170T9U1714">in1</span>(<span class="mxinfo " id="T10:U50">4</span>,<span class="mxinfo " id="T10:U51">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,425" id="srcline425">425</a></span><span class="line"><span class="mxinfo " id="T1:U52"><span class="var type1" id="S180T1U1719">x5</span> = <span class="mxinfo " id="T1:U54"><span class="var type1" id="S170T9U1721">in1</span>(<span class="mxinfo " id="T10:U56">5</span>,<span class="mxinfo " id="T10:U57">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,426" id="srcline426">426</a></span><span class="line"><span class="mxinfo " id="T1:U58"><span class="var type1" id="S181T1U1726">x8</span> = <span class="mxinfo " id="T1:U60"><span class="var type1" id="S170T9U1728">in1</span>(<span class="mxinfo " id="T10:U62">8</span>,<span class="mxinfo " id="T10:U63">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,427" id="srcline427">427</a></span><span class="line"><span class="mxinfo " id="T1:U64"><span class="var type1" id="S182T1U1733">x9</span> = <span class="mxinfo " id="T1:U66"><span class="var type1" id="S170T9U1735">in1</span>(<span class="mxinfo " id="T10:U68">9</span>,<span class="mxinfo " id="T10:U69">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,428" id="srcline428">428</a></span><span class="line"><span class="mxinfo " id="T1:U70"><span class="var type1" id="S183T1U1740">x10</span> = <span class="mxinfo " id="T1:U72"><span class="var type1" id="S170T9U1742">in1</span>(<span class="mxinfo " id="T10:U74">10</span>,<span class="mxinfo " id="T10:U75">:</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,429" id="srcline429">429</a></span><span class="line"><span class="mxinfo " id="T1:U76"><span class="var type1" id="S184T1U1747">t2</span> = <span class="mxinfo  sgl" id="T1:U78"><span class="message warning" id="M20F529C">cosd(<span class="var type1 sgl" id="S178T1U1750">x3</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,430" id="srcline430">430</a></span><span class="line"><span class="mxinfo " id="T1:U80"><span class="var type1" id="S186T1U1753">t3</span> = <span class="mxinfo  sgl" id="T1:U82"><span class="message warning" id="M21F529C">sind(<span class="var type1 sgl" id="S178T1U1756">x3</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,431" id="srcline431">431</a></span><span class="line"><span class="mxinfo " id="T1:U84"><span class="var type1" id="S188T1U1759">t4</span> = <span class="mxinfo " id="T1:U86"><span class="var type1" id="S178T1U1761">x3</span>+<span class="var type1" id="S179T1U1762">x4</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,432" id="srcline432">432</a></span><span class="line"><span class="mxinfo " id="T1:U89"><span class="var type1" id="S189T1U1765">t5</span> = <span class="mxinfo " id="T1:U91"><span class="var type1" id="S181T1U1767">x8</span>+<span class="var type1" id="S182T1U1768">x9</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,433" id="srcline433">433</a></span><span class="line"><span class="mxinfo " id="T1:U94"><span class="var type1" id="S190T1U1771">t6</span> = <span class="mxinfo  sgl" id="T1:U96"><span class="message warning" id="M22F529C">cosd(<span class="var type1" id="S188T1U1774">t4</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,434" id="srcline434">434</a></span><span class="line"><span class="mxinfo " id="T1:U98"><span class="var type1" id="S191T1U1777">t7</span> = <span class="mxinfo  sgl" id="T1:U100"><span class="message warning" id="M23F529C">sind(<span class="var type1" id="S188T1U1780">t4</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,435" id="srcline435">435</a></span><span class="line"><span class="mxinfo  sgl" id="T1:U102"><span class="var type1" id="S192T1U1783">t8</span> = <span class="mxinfo  sgl" id="T1:U104"><span class="var type1" id="S188T1U1785">t4</span>+<span class="var type1" id="S180T1U1786">x5</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,436" id="srcline436">436</a></span><span class="line"><span class="mxinfo  sgl" id="T1:U107"><span class="var type1" id="S193T1U1789">t9</span> = <span class="mxinfo  sgl" id="T1:U109"><span class="var type1" id="S189T1U1791">t5</span>+<span class="var type1" id="S183T1U1792">x10</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,437" id="srcline437">437</a></span><span class="line"><span class="mxinfo " id="T1:U112"><span class="var type1" id="S194T1U1795">t10</span> = <span class="mxinfo  sgl" id="T1:U114"><span class="message warning" id="M24F529C">cosd(<span class="var type1 sgl" id="S192T1U1798">t8</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,438" id="srcline438">438</a></span><span class="line"><span class="mxinfo " id="T1:U116"><span class="var type1" id="S195T1U1801">t11</span> = <span class="mxinfo  sgl" id="T1:U118">sind(<span class="var type1" id="S192T1U1804">t8</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,439" id="srcline439">439</a></span><span class="line"><span class="mxinfo  sgl" id="T1:U120"><span class="var type1" id="S169T1U1807">l1dot</span> = <span class="mxinfo  sgl" id="T1:U122">(<span class="mxinfo  sgl" id="T1:U123"><span class="mxinfo  sgl" id="T1:U124"><span class="mxinfo " id="T1:U125">1.0</span>./<span class="mxinfo  dbl sgl" id="T1:U126">sqrt(<span class="mxinfo  sgl" id="T1:U127"><span class="mxinfo  sgl" id="T1:U128">(<span class="mxinfo  sgl" id="T1:U129"><span class="mxinfo  sgl" id="T1:U130"><span class="mxinfo  sgl" id="T1:U131"><span class="mxinfo " id="T1:U132"><span class="var type1" id="S177T1U1822">py</span>+<span class="mxinfo  sgl" id="T1:U134"><span class="var type1" id="S172T1U1824">la</span>.*<span class="var type1" id="S194T1U1825">t10</span></span></span>-<span class="mxinfo  sgl" id="T1:U137"><span class="var type1" id="S173T1U1827">lf</span>.*<span class="var type1" id="S195T1U1828">t11</span></span></span>+<span class="mxinfo  sgl" id="T1:U140"><span class="var type1" id="S174T1U1830">ls</span>.*<span class="var type1" id="S190T1U1831">t6</span></span></span>+<span class="mxinfo  sgl" id="T1:U143"><span class="var type1" id="S175T1U1833">lt</span>.*<span class="var type1" id="S184T1U1834">t2</span></span></span>).^2</span>+<span class="mxinfo  sgl" id="T1:U146">(<span class="mxinfo  sgl" id="T1:U147"><span class="mxinfo  sgl" id="T1:U148"><span class="mxinfo  sgl" id="T1:U149"><span class="mxinfo " id="T1:U150"><span class="mxinfo " id="T1:U151">-<span class="var type1" id="S176T1U1843">px</span></span>+<span class="mxinfo  sgl" id="T1:U153"><span class="var type1" id="S172T1U1845">la</span>.*<span class="var type1" id="S195T1U1846">t11</span></span></span>+<span class="mxinfo  sgl" id="T1:U156"><span class="var type1" id="S173T1U1848">lf</span>.*<span class="var type1" id="S194T1U1849">t10</span></span></span>+<span class="mxinfo  sgl" id="T1:U159"><span class="var type1" id="S174T1U1851">ls</span>.*<span class="var type1" id="S191T1U1852">t7</span></span></span>+<span class="mxinfo  sgl" id="T1:U162"><span class="var type1" id="S175T1U1854">lt</span>.*<span class="var type1" id="S186T1U1855">t3</span></span></span>).^2</span></span>)</span></span>.*(<span class="mxinfo  sgl" id="T1:U165"><span class="mxinfo  sgl" id="T1:U166">(<span class="mxinfo  sgl" id="T1:U167"><span class="mxinfo  sgl" id="T1:U168"><span class="mxinfo  sgl" id="T1:U169"><span class="mxinfo  sgl" id="T1:U170"><span class="mxinfo  sgl" id="T1:U171"><span class="var type1" id="S172T1U1866">la</span>.*<span class="var type1 sgl" id="S193T1U1867">t9</span></span>.*<span class="var type1" id="S194T1U1868">t10</span></span>-<span class="mxinfo  sgl" id="T1:U175"><span class="mxinfo  sgl" id="T1:U176"><span class="var type1" id="S173T1U1871">lf</span>.*<span class="var type1 sgl" id="S193T1U1872">t9</span></span>.*<span class="var type1" id="S195T1U1873">t11</span></span></span>+<span class="mxinfo  sgl" id="T1:U180"><span class="mxinfo  sgl" id="T1:U181"><span class="var type1" id="S174T1U1876">ls</span>.*<span class="var type1" id="S189T1U1877">t5</span></span>.*<span class="var type1" id="S190T1U1878">t6</span></span></span>+<span class="mxinfo  sgl" id="T1:U185"><span class="mxinfo  sgl" id="T1:U186"><span class="var type1" id="S175T1U1881">lt</span>.*<span class="var type1" id="S184T1U1882">t2</span></span>.*<span class="var type1" id="S181T1U1883">x8</span></span></span>).*(<span class="mxinfo  sgl" id="T1:U190"><span class="mxinfo  sgl" id="T1:U191"><span class="mxinfo  sgl" id="T1:U192"><span class="mxinfo " id="T1:U193"><span class="mxinfo " id="T1:U194"><span class="var type1" id="S176T1U1890">px</span>.*-2.0</span>+<span class="mxinfo  sgl" id="T1:U196"><span class="mxinfo  sgl" id="T1:U197"><span class="var type1" id="S172T1U1895">la</span>.*<span class="var type1" id="S195T1U1896">t11</span></span>.*2.0</span></span>+<span class="mxinfo  sgl" id="T1:U200"><span class="mxinfo  sgl" id="T1:U201"><span class="var type1" id="S173T1U1900">lf</span>.*<span class="var type1" id="S194T1U1901">t10</span></span>.*2.0</span></span>+<span class="mxinfo  sgl" id="T1:U204"><span class="mxinfo  sgl" id="T1:U205"><span class="var type1" id="S174T1U1905">ls</span>.*<span class="var type1" id="S191T1U1906">t7</span></span>.*2.0</span></span>+<span class="mxinfo  sgl" id="T1:U208"><span class="mxinfo  sgl" id="T1:U209"><span class="var type1" id="S175T1U1910">lt</span>.*<span class="var type1" id="S186T1U1911">t3</span></span>.*2.0</span></span>)</span>-<span class="mxinfo  sgl" id="T1:U212">(<span class="mxinfo  sgl" id="T1:U213"><span class="mxinfo  sgl" id="T1:U214"><span class="mxinfo  sgl" id="T1:U215"><span class="mxinfo  sgl" id="T1:U216"><span class="mxinfo  sgl" id="T1:U217"><span class="var type1" id="S172T1U1920">la</span>.*<span class="var type1 sgl" id="S193T1U1921">t9</span></span>.*<span class="var type1" id="S195T1U1922">t11</span></span>+<span class="mxinfo  sgl" id="T1:U221"><span class="mxinfo  sgl" id="T1:U222"><span class="var type1" id="S173T1U1925">lf</span>.*<span class="var type1 sgl" id="S193T1U1926">t9</span></span>.*<span class="var type1" id="S194T1U1927">t10</span></span></span>+<span class="mxinfo  sgl" id="T1:U226"><span class="mxinfo  sgl" id="T1:U227"><span class="var type1" id="S174T1U1930">ls</span>.*<span class="var type1" id="S189T1U1931">t5</span></span>.*<span class="var type1" id="S191T1U1932">t7</span></span></span>+<span class="mxinfo  sgl" id="T1:U231"><span class="mxinfo  sgl" id="T1:U232"><span class="var type1" id="S175T1U1935">lt</span>.*<span class="var type1" id="S186T1U1936">t3</span></span>.*<span class="var type1" id="S181T1U1937">x8</span></span></span>).*(<span class="mxinfo  sgl" id="T1:U236"><span class="mxinfo  sgl" id="T1:U237"><span class="mxinfo  sgl" id="T1:U238"><span class="mxinfo " id="T1:U239"><span class="mxinfo " id="T1:U240"><span class="var type1" id="S177T1U1944">py</span>.*2.0</span>+<span class="mxinfo  sgl" id="T1:U242"><span class="mxinfo  sgl" id="T1:U243"><span class="var type1" id="S172T1U1948">la</span>.*<span class="var type1" id="S194T1U1949">t10</span></span>.*2.0</span></span>-<span class="mxinfo  sgl" id="T1:U246"><span class="mxinfo  sgl" id="T1:U247"><span class="var type1" id="S173T1U1953">lf</span>.*<span class="var type1" id="S195T1U1954">t11</span></span>.*2.0</span></span>+<span class="mxinfo  sgl" id="T1:U250"><span class="mxinfo  sgl" id="T1:U251"><span class="var type1" id="S174T1U1958">ls</span>.*<span class="var type1" id="S190T1U1959">t6</span></span>.*2.0</span></span>+<span class="mxinfo  sgl" id="T1:U254"><span class="mxinfo  sgl" id="T1:U255"><span class="var type1" id="S175T1U1963">lt</span>.*<span class="var type1" id="S184T1U1964">t2</span></span>.*2.0</span></span>)</span></span>)</span>)./<span class="mxinfo " id="T1:U258">2.0</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,440" id="srcline440">440</a></span><span class="line"><span class="keyword">end</span></span></span>
+</pre>
+<div class="dead">
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,441" id="srcline441">441</a></span><span class="line">function y = Saturate(x,L1,L2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,442" id="srcline442">442</a></span><span class="line">    <span class="comment">%Function to prevent the desired joint angles from changing to fast. </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,443" id="srcline443">443</a></span><span class="line">    <span class="comment">%Works via saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,444" id="srcline444">444</a></span><span class="line">    y = min(x,max(L1,L2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,445" id="srcline445">445</a></span><span class="line">    y = max(y,min(L1,L2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,446" id="srcline446">446</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,447" id="srcline447">447</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,448" id="srcline448">448</a></span><span class="line">function l1 = Spring_Length_func(in1,in2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,449" id="srcline449">449</a></span><span class="line"><span class="comment">%SPRING_LENGTH_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,450" id="srcline450">450</a></span><span class="line"><span class="comment">%    L1 = SPRING_LENGTH_FUNC(IN1,IN2)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,451" id="srcline451">451</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,452" id="srcline452">452</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,453" id="srcline453">453</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:42</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,454" id="srcline454">454</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,455" id="srcline455">455</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,456" id="srcline456">456</a></span><span class="line">la = in2(:,6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,457" id="srcline457">457</a></span><span class="line">lf = in2(:,7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,458" id="srcline458">458</a></span><span class="line">ls = in2(:,5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,459" id="srcline459">459</a></span><span class="line">lt = in2(:,4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,460" id="srcline460">460</a></span><span class="line">px = in2(:,8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,461" id="srcline461">461</a></span><span class="line">py = in2(:,9);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,462" id="srcline462">462</a></span><span class="line">x3 = in1(3,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,463" id="srcline463">463</a></span><span class="line">x4 = in1(4,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,464" id="srcline464">464</a></span><span class="line">x5 = in1(5,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,465" id="srcline465">465</a></span><span class="line">t2 = x3+x4;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,466" id="srcline466">466</a></span><span class="line">t3 = t2+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,467" id="srcline467">467</a></span><span class="line">t4 = cosd(t3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,468" id="srcline468">468</a></span><span class="line">t5 = sind(t3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,469" id="srcline469">469</a></span><span class="line">l1 = sqrt((-px+la.*t5+lf.*t4+ls.*sind(t2)+lt.*sind(x3)).^2+(py+la.*t4-lf.*t5+ls.*cosd(t2)+lt.*cosd(x3)).^2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,470" id="srcline470">470</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,471" id="srcline471">471</a></span><span class="line">function lJacob = Spring_Jacobian_func(in1,in2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,472" id="srcline472">472</a></span><span class="line"><span class="comment">%SPRING_JACOBIAN_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,473" id="srcline473">473</a></span><span class="line"><span class="comment">%    LJACOB = SPRING_JACOBIAN_FUNC(IN1,IN2)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,474" id="srcline474">474</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,475" id="srcline475">475</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,476" id="srcline476">476</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:45</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,477" id="srcline477">477</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,478" id="srcline478">478</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,479" id="srcline479">479</a></span><span class="line">la = in2(:,6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,480" id="srcline480">480</a></span><span class="line">lf = in2(:,7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,481" id="srcline481">481</a></span><span class="line">ls = in2(:,5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,482" id="srcline482">482</a></span><span class="line">lt = in2(:,4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,483" id="srcline483">483</a></span><span class="line">px = in2(:,8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,484" id="srcline484">484</a></span><span class="line">py = in2(:,9);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,485" id="srcline485">485</a></span><span class="line">x3 = in1(3,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,486" id="srcline486">486</a></span><span class="line">x4 = in1(4,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,487" id="srcline487">487</a></span><span class="line">x5 = in1(5,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,488" id="srcline488">488</a></span><span class="line">t2 = cosd(x3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,489" id="srcline489">489</a></span><span class="line">t3 = sind(x3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,490" id="srcline490">490</a></span><span class="line">t4 = la.*py;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,491" id="srcline491">491</a></span><span class="line">t5 = lf.*px;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,492" id="srcline492">492</a></span><span class="line">t6 = x3+x4;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,493" id="srcline493">493</a></span><span class="line">t7 = x4+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,494" id="srcline494">494</a></span><span class="line">t15 = -px;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,495" id="srcline495">495</a></span><span class="line">t8 = lt.*t2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,496" id="srcline496">496</a></span><span class="line">t9 = cosd(t6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,497" id="srcline497">497</a></span><span class="line">t10 = cosd(t7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,498" id="srcline498">498</a></span><span class="line">t11 = lt.*t3;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,499" id="srcline499">499</a></span><span class="line">t12 = sind(t6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,500" id="srcline500">500</a></span><span class="line">t13 = sind(t7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,501" id="srcline501">501</a></span><span class="line">t14 = t6+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,502" id="srcline502">502</a></span><span class="line">t18 = -t5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,503" id="srcline503">503</a></span><span class="line">t16 = cosd(t14);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,504" id="srcline504">504</a></span><span class="line">t17 = sind(t14);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,505" id="srcline505">505</a></span><span class="line">t19 = ls.*t9;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,506" id="srcline506">506</a></span><span class="line">t20 = ls.*t12;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,507" id="srcline507">507</a></span><span class="line">t23 = lf.*lt.*t10;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,508" id="srcline508">508</a></span><span class="line">t27 = la.*lt.*t13;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,509" id="srcline509">509</a></span><span class="line">t32 = t4+t18;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,510" id="srcline510">510</a></span><span class="line">t21 = la.*t17;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,511" id="srcline511">511</a></span><span class="line">t22 = lf.*t17;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,512" id="srcline512">512</a></span><span class="line">t24 = px.*t19;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,513" id="srcline513">513</a></span><span class="line">t25 = la.*t16;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,514" id="srcline514">514</a></span><span class="line">t26 = lf.*t16;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,515" id="srcline515">515</a></span><span class="line">t28 = py.*t20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,516" id="srcline516">516</a></span><span class="line">t33 = t17.*t32;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,517" id="srcline517">517</a></span><span class="line">t29 = px.*t25;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,518" id="srcline518">518</a></span><span class="line">t30 = py.*t26;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,519" id="srcline519">519</a></span><span class="line">t31 = -t22;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,520" id="srcline520">520</a></span><span class="line">t35 = t11+t15+t20+t21+t26;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,521" id="srcline521">521</a></span><span class="line">t34 = py+t8+t19+t25+t31;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,522" id="srcline522">522</a></span><span class="line">t37 = t35.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,523" id="srcline523">523</a></span><span class="line">t36 = t34.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,524" id="srcline524">524</a></span><span class="line">t38 = t36+t37;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,525" id="srcline525">525</a></span><span class="line">t39 = 1.0./sqrt(t38);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,526" id="srcline526">526</a></span><span class="line">lJacob = [0.0;0.0;-t39.*(t24+t28+t29+t30+t33+px.*t8+py.*t11);-t39.*(t23+t24+t27+t28+t33+t16.*(la.*px+lf.*py)+ls.*lt.*sind(x4));-t39.*(t23+t27+t29+t30+t33+lf.*ls.*cosd(x5)+la.*ls.*sind(x5))];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,527" id="srcline527">527</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,528" id="srcline528">528</a></span><span class="line">function Pe = PE_func(in1,in2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,529" id="srcline529">529</a></span><span class="line"><span class="comment">%PE_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,530" id="srcline530">530</a></span><span class="line"><span class="comment">%    PE = PE_FUNC(IN1,IN2)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,531" id="srcline531">531</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,532" id="srcline532">532</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,533" id="srcline533">533</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:41</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,534" id="srcline534">534</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,535" id="srcline535">535</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,536" id="srcline536">536</a></span><span class="line">Mf = in2(:,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,537" id="srcline537">537</a></span><span class="line">Ms = in2(:,2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,538" id="srcline538">538</a></span><span class="line">Mt = in2(:,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,539" id="srcline539">539</a></span><span class="line">la = in2(:,6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,540" id="srcline540">540</a></span><span class="line">lf = in2(:,7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,541" id="srcline541">541</a></span><span class="line">ls = in2(:,5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,542" id="srcline542">542</a></span><span class="line">lt = in2(:,4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,543" id="srcline543">543</a></span><span class="line">x2 = in1(2,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,544" id="srcline544">544</a></span><span class="line">x3 = in1(3,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,545" id="srcline545">545</a></span><span class="line">x4 = in1(4,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,546" id="srcline546">546</a></span><span class="line">x5 = in1(5,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,547" id="srcline547">547</a></span><span class="line">t2 = Mf.*2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,548" id="srcline548">548</a></span><span class="line">t3 = x3+x4+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,549" id="srcline549">549</a></span><span class="line">Pe = x2.*(Mf.*4.0+Ms.*4.0+Mt.*4.0).*(9.81e+2./4.0e+2)+Mf.*lf.*sind(t3).*(9.81e+2./4.0e+2)-lt.*cosd(x3).*(Ms.*2.0+Mt+t2).*(9.81e+2./2.0e+2)-ls.*cosd(x3+x4).*(Ms+t2).*(9.81e+2./2.0e+2)-Mf.*la.*cosd(t3).*(9.81e+2./2.0e+2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,550" id="srcline550">550</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,551" id="srcline551">551</a></span><span class="line">function Ke = KE_func(in1,in2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,552" id="srcline552">552</a></span><span class="line"><span class="comment">%KE_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,553" id="srcline553">553</a></span><span class="line"><span class="comment">%    KE = KE_FUNC(IN1,IN2)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,554" id="srcline554">554</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,555" id="srcline555">555</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,556" id="srcline556">556</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:40</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,557" id="srcline557">557</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,558" id="srcline558">558</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,559" id="srcline559">559</a></span><span class="line">Mf = in2(:,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,560" id="srcline560">560</a></span><span class="line">Ms = in2(:,2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,561" id="srcline561">561</a></span><span class="line">Mt = in2(:,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,562" id="srcline562">562</a></span><span class="line">la = in2(:,6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,563" id="srcline563">563</a></span><span class="line">lf = in2(:,7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,564" id="srcline564">564</a></span><span class="line">ls = in2(:,5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,565" id="srcline565">565</a></span><span class="line">lt = in2(:,4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,566" id="srcline566">566</a></span><span class="line">x3 = in1(3,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,567" id="srcline567">567</a></span><span class="line">x4 = in1(4,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,568" id="srcline568">568</a></span><span class="line">x5 = in1(5,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,569" id="srcline569">569</a></span><span class="line">x6 = in1(6,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,570" id="srcline570">570</a></span><span class="line">x7 = in1(7,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,571" id="srcline571">571</a></span><span class="line">x8 = in1(8,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,572" id="srcline572">572</a></span><span class="line">x9 = in1(9,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,573" id="srcline573">573</a></span><span class="line">x10 = in1(10,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,574" id="srcline574">574</a></span><span class="line">t2 = cosd(x3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,575" id="srcline575">575</a></span><span class="line">t3 = cosd(x4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,576" id="srcline576">576</a></span><span class="line">t4 = cosd(x5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,577" id="srcline577">577</a></span><span class="line">t5 = sind(x3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,578" id="srcline578">578</a></span><span class="line">t6 = sind(x4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,579" id="srcline579">579</a></span><span class="line">t7 = sind(x5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,580" id="srcline580">580</a></span><span class="line">t8 = x3+x4;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,581" id="srcline581">581</a></span><span class="line">t9 = x4+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,582" id="srcline582">582</a></span><span class="line">t10 = lt.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,583" id="srcline583">583</a></span><span class="line">t20 = -lf;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,584" id="srcline584">584</a></span><span class="line">t24 = la./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,585" id="srcline585">585</a></span><span class="line">t25 = ls./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,586" id="srcline586">586</a></span><span class="line">t11 = t2.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,587" id="srcline587">587</a></span><span class="line">t12 = t5.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,588" id="srcline588">588</a></span><span class="line">t13 = ls.*t4;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,589" id="srcline589">589</a></span><span class="line">t14 = lt.*t3;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,590" id="srcline590">590</a></span><span class="line">t15 = cosd(t8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,591" id="srcline591">591</a></span><span class="line">t16 = cosd(t9);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,592" id="srcline592">592</a></span><span class="line">t17 = sind(t8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,593" id="srcline593">593</a></span><span class="line">t18 = sind(t9);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,594" id="srcline594">594</a></span><span class="line">t19 = t8+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,595" id="srcline595">595</a></span><span class="line">t23 = ls.*t7.*4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,596" id="srcline596">596</a></span><span class="line">t35 = (Mt.*lt.*t5)./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,597" id="srcline597">597</a></span><span class="line">t39 = (Mt.*lt.*t2)./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,598" id="srcline598">598</a></span><span class="line">t21 = cosd(t19);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,599" id="srcline599">599</a></span><span class="line">t22 = sind(t19);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,600" id="srcline600">600</a></span><span class="line">t26 = t15.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,601" id="srcline601">601</a></span><span class="line">t27 = t17.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,602" id="srcline602">602</a></span><span class="line">t28 = lt.*t16;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,603" id="srcline603">603</a></span><span class="line">t29 = -t23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,604" id="srcline604">604</a></span><span class="line">t30 = Mt.*t11;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,605" id="srcline605">605</a></span><span class="line">t31 = Mt.*t12;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,606" id="srcline606">606</a></span><span class="line">t33 = lt.*t18.*4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,607" id="srcline607">607</a></span><span class="line">t42 = Ms.*lt.*t6.*t15;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,608" id="srcline608">608</a></span><span class="line">t43 = Ms.*lt.*t6.*t17;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,609" id="srcline609">609</a></span><span class="line">t44 = Ms.*t15.*t25;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,610" id="srcline610">610</a></span><span class="line">t45 = t13+t24;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,611" id="srcline611">611</a></span><span class="line">t46 = t14+t25;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,612" id="srcline612">612</a></span><span class="line">t47 = Ms.*t17.*t25;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,613" id="srcline613">613</a></span><span class="line">t32 = t21.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,614" id="srcline614">614</a></span><span class="line">t34 = t22.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,615" id="srcline615">615</a></span><span class="line">t36 = lf+t29;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,616" id="srcline616">616</a></span><span class="line">t37 = Ms.*t26;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,617" id="srcline617">617</a></span><span class="line">t38 = Ms.*t27;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,618" id="srcline618">618</a></span><span class="line">t48 = Mf.*t21.*t24;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,619" id="srcline619">619</a></span><span class="line">t49 = (Mf.*lf.*t21)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,620" id="srcline620">620</a></span><span class="line">t50 = Mf.*t22.*t24;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,621" id="srcline621">621</a></span><span class="line">t51 = (Mf.*lf.*t22)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,622" id="srcline622">622</a></span><span class="line">t52 = -t42;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,623" id="srcline623">623</a></span><span class="line">t55 = Ms.*t15.*t46;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,624" id="srcline624">624</a></span><span class="line">t56 = Ms.*t17.*t46;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,625" id="srcline625">625</a></span><span class="line">t57 = t28+t45;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,626" id="srcline626">626</a></span><span class="line">t58 = Mf.*t24.*t45;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,627" id="srcline627">627</a></span><span class="line">t59 = Ms.*t25.*t46;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,628" id="srcline628">628</a></span><span class="line">t60 = t20+t23+t33;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,629" id="srcline629">629</a></span><span class="line">t61 = Mf.*t21.*t45;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,630" id="srcline630">630</a></span><span class="line">t62 = Mf.*t22.*t45;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,631" id="srcline631">631</a></span><span class="line">t40 = Mf.*t32;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,632" id="srcline632">632</a></span><span class="line">t41 = Mf.*t34;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,633" id="srcline633">633</a></span><span class="line">t53 = -t51;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,634" id="srcline634">634</a></span><span class="line">t54 = (Mf.*lf.*t36)./1.6e+1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,635" id="srcline635">635</a></span><span class="line">t63 = (Mf.*t21.*t36)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,636" id="srcline636">636</a></span><span class="line">t64 = (Mf.*t22.*t36)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,637" id="srcline637">637</a></span><span class="line">t66 = Mf.*t24.*t57;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,638" id="srcline638">638</a></span><span class="line">t67 = Mf.*t21.*t57;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,639" id="srcline639">639</a></span><span class="line">t68 = Mf.*t22.*t57;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,640" id="srcline640">640</a></span><span class="line">t69 = t49+t50;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,641" id="srcline641">641</a></span><span class="line">t70 = (Mf.*lf.*t60)./1.6e+1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,642" id="srcline642">642</a></span><span class="line">t73 = (Mf.*t21.*t60)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,643" id="srcline643">643</a></span><span class="line">t74 = (Mf.*t22.*t60)./4.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,644" id="srcline644">644</a></span><span class="line">t76 = Mf.*t45.*t57;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,645" id="srcline645">645</a></span><span class="line">t77 = (Mf.*t36.*t60)./1.6e+1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,646" id="srcline646">646</a></span><span class="line">t65 = -t64;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,647" id="srcline647">647</a></span><span class="line">t71 = t48+t53;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,648" id="srcline648">648</a></span><span class="line">t72 = -t70;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,649" id="srcline649">649</a></span><span class="line">t75 = -t73;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,650" id="srcline650">650</a></span><span class="line">t78 = -t77;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,651" id="srcline651">651</a></span><span class="line">t79 = t54+t58;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,652" id="srcline652">652</a></span><span class="line">t80 = t47+t62+t63;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,653" id="srcline653">653</a></span><span class="line">t82 = t30+t31+t37+t38+t40+t41;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,654" id="srcline654">654</a></span><span class="line">t85 = t39+t43+t55+t67+t74;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,655" id="srcline655">655</a></span><span class="line">t81 = t44+t61+t65;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,656" id="srcline656">656</a></span><span class="line">t83 = t66+t72;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,657" id="srcline657">657</a></span><span class="line">t84 = t59+t76+t78;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,658" id="srcline658">658</a></span><span class="line">t86 = t35+t52+t56+t68+t75;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,659" id="srcline659">659</a></span><span class="line">Ke = (x9.*(t80.*x7+t81.*x6+t79.*x10+t84.*x8+x9.*((Ms.*ls.^2)./4.0+(Mf.*t36.^2)./1.6e+1+Mf.*t45.^2)))./2.0+(x8.*(-x10.*(t70-(Mf.*la.*t57)./2.0)+t85.*x6+t84.*x9+t86.*x7+x8.*((Mt.*t10)./4.0+Mf.*t57.^2+(Mf.*t60.^2)./1.6e+1+Ms.*t46.^2+Ms.*t6.^2.*t10)))./2.0+(x6.*(t71.*x10+t82.*x6+t81.*x9+t85.*x8))./2.0+(x7.*(t69.*x10+t80.*x9+t82.*x7+t86.*x8))./2.0+(x10.*(x10.*((Mf.*la.^2)./4.0+(Mf.*lf.^2)./1.6e+1)-x8.*(t70-(Mf.*la.*t57)./2.0)+t69.*x7+t71.*x6+t79.*x9))./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,660" id="srcline660">660</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,661" id="srcline661">661</a></span><span class="line">function GShape = G_Shape_Law_func(in1,in2,xshift)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,662" id="srcline662">662</a></span><span class="line"><span class="comment">%G_SHAPE_LAW_FUNC</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,663" id="srcline663">663</a></span><span class="line"><span class="comment">%    GSHAPE = G_SHAPE_LAW_FUNC(IN1,IN2,XSHIFT)</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,664" id="srcline664">664</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,665" id="srcline665">665</a></span><span class="line"><span class="comment">%    This function was generated by the Symbolic Math Toolbox version 8.3.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,666" id="srcline666">666</a></span><span class="line"><span class="comment">%    31-Jan-2020 14:49:33</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,667" id="srcline667">667</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,668" id="srcline668">668</a></span><span class="line"><span class="comment">%Prosthesis file. Needs state and parameters as inputs</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,669" id="srcline669">669</a></span><span class="line">Mf = in2(:,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,670" id="srcline670">670</a></span><span class="line">Ms = in2(:,2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,671" id="srcline671">671</a></span><span class="line">Mt = in2(:,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,672" id="srcline672">672</a></span><span class="line">la = in2(:,6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,673" id="srcline673">673</a></span><span class="line">lf = in2(:,7);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,674" id="srcline674">674</a></span><span class="line">ls = in2(:,5);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,675" id="srcline675">675</a></span><span class="line">lt = in2(:,4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,676" id="srcline676">676</a></span><span class="line">x3 = in1(3,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,677" id="srcline677">677</a></span><span class="line">x4 = in1(4,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,678" id="srcline678">678</a></span><span class="line">x5 = in1(5,:);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,679" id="srcline679">679</a></span><span class="line">t2 = Mf.*2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,680" id="srcline680">680</a></span><span class="line">t4 = xshift./2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,681" id="srcline681">681</a></span><span class="line">t3 = Ms+t2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,682" id="srcline682">682</a></span><span class="line">t5 = sind(t4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,683" id="srcline683">683</a></span><span class="line">t6 = t4+x3+x4;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,684" id="srcline684">684</a></span><span class="line">t7 = cosd(t6);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,685" id="srcline685">685</a></span><span class="line">t8 = t6+x5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,686" id="srcline686">686</a></span><span class="line">t9 = cosd(t8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,687" id="srcline687">687</a></span><span class="line">t10 = sind(t8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,688" id="srcline688">688</a></span><span class="line">t14 = ls.*t3.*t7.*2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,689" id="srcline689">689</a></span><span class="line">t11 = lf.*t10;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,690" id="srcline690">690</a></span><span class="line">t12 = la.*t9.*2.0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,691" id="srcline691">691</a></span><span class="line">t13 = -t11;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,692" id="srcline692">692</a></span><span class="line">t15 = t12+t13;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,693" id="srcline693">693</a></span><span class="line">GShape = [0.0;0.0;t5.*(t14-Mf.*(t11-t12)+lt.*cosd(t4+x3).*(Ms+Mt+t3).*2.0).*(-9.81e+2./2.0e+2);t5.*(t14+Mf.*t13+la.*t2.*t9).*(-9.81e+2./2.0e+2);Mf.*t5.*(t11-t12).*(9.81e+2./2.0e+2)];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,694" id="srcline694">694</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,695" id="srcline695">695</a></span><span class="line">function [y,dy] = spline3(x,y0,dy0,y1,dy1)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,696" id="srcline696">696</a></span><span class="line"><span class="comment">%x is spline input parameter between 0 and 1</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,697" id="srcline697">697</a></span><span class="line"><span class="comment">% y0 and y1 are the position start and finish</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,698" id="srcline698">698</a></span><span class="line"><span class="comment">% dy0 and dy1 are the velocity start and finish</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,699" id="srcline699">699</a></span><span class="line">    a0=y0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,700" id="srcline700">700</a></span><span class="line">    a1=dy0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,701" id="srcline701">701</a></span><span class="line">    a2=3*y1-3*y0-2*dy0-dy1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,702" id="srcline702">702</a></span><span class="line">    a3=-2*y1+2*y0+dy0+dy1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,703" id="srcline703">703</a></span><span class="line">    if x&lt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,704" id="srcline704">704</a></span><span class="line">        y=y0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,705" id="srcline705">705</a></span><span class="line">        dy=dy0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,706" id="srcline706">706</a></span><span class="line">    elseif x&gt;1</span></span>
+<span class="srcline"><span class="lineno"><a href="1,707" id="srcline707">707</a></span><span class="line">        y=y1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,708" id="srcline708">708</a></span><span class="line">        dy=dy1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,709" id="srcline709">709</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,710" id="srcline710">710</a></span><span class="line">        y=a0+a1*x+a2*x.^2+a3*x.^3;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,711" id="srcline711">711</a></span><span class="line">        dy=a1+2*a2*x+3*a3*x.^2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,712" id="srcline712">712</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,713" id="srcline713">713</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,714" id="srcline714">714</a></span><span class="line">function cop = COP(F)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,715" id="srcline715">715</a></span><span class="line">   <span class="comment">%F is a 6 element wrench giving the  x,y,z force and x,y,z, axis moments</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,716" id="srcline716">716</a></span><span class="line">   cop = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,717" id="srcline717">717</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,718" id="srcline718">718</a></span><span class="line">function [knee_r,dknee_r,ankle_r,dankle_r] = winterFit(n,a_knee,a_ankle,knee_ind,ankle_ind)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,719" id="srcline719">719</a></span><span class="line">m1=2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,720" id="srcline720">720</a></span><span class="line">m2=6;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,721" id="srcline721">721</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,722" id="srcline722">722</a></span><span class="line">c_n_knee=n-knee_ind;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,723" id="srcline723">723</a></span><span class="line">j_knee=length(c_n_knee(c_n_knee&gt;=0));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,724" id="srcline724">724</a></span><span class="line">x=(n-knee_ind(j_knee))/(knee_ind(j_knee+1)-knee_ind(j_knee));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,725" id="srcline725">725</a></span><span class="line">knee_r=a_knee(j_knee,1)*(x-1).^m1+a_knee(j_knee,2)*(x-1).^m2+a_knee(j_knee,4)*(x-1)+a_knee(j_knee,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,726" id="srcline726">726</a></span><span class="line">dknee_r=(m1*a_knee(j_knee,1)*(x-1).^(m1-1)+m2*a_knee(j_knee,2)*(x-1).^(m2-1)+a_knee(j_knee,4))/(knee_ind(j_knee+1)-knee_ind(j_knee));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,727" id="srcline727">727</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,728" id="srcline728">728</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,729" id="srcline729">729</a></span><span class="line">c_n_ankle=n-ankle_ind;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,730" id="srcline730">730</a></span><span class="line">j_ankle=length(c_n_ankle(c_n_ankle&gt;=0));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,731" id="srcline731">731</a></span><span class="line">x=(n-ankle_ind(j_ankle))/(ankle_ind(j_ankle+1)-ankle_ind(j_ankle));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,732" id="srcline732">732</a></span><span class="line">ankle_r=a_ankle(j_ankle,1)*(x-1).^m1+a_ankle(j_ankle,2)*(x-1).^m2+a_ankle(j_ankle,4)*(x-1)+a_ankle(j_ankle,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,733" id="srcline733">733</a></span><span class="line">dankle_r=(m1*a_ankle(j_ankle,1)*(x-1).^(m1-1)+m2*a_ankle(j_ankle,2)*(x-1).^(m2-1)+a_ankle(j_ankle,4))/(ankle_ind(j_ankle+1)-ankle_ind(j_ankle));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,734" id="srcline734">734</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,735" id="srcline735">735</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,736" id="srcline736">736</a></span><span class="line">function y = clamp(x,x1,x2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,737" id="srcline737">737</a></span><span class="line">y=min(x,max(x1,x2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,738" id="srcline738">738</a></span><span class="line">y=max(y,min(x1,x2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,739" id="srcline739">739</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,740" id="srcline740">740</a></span><span class="line"> </span></span>
+</pre>
+</div>
