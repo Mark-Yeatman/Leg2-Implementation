@@ -31,13 +31,11 @@ persistent hip_pos_prev...
            knee_vel_prev...
            ankle_vel_prev...
            hip_vel_prev...
-           IMU_pitch_prev...
            Esys_integrate...
            t_switched_phase...
            Stance...
            Swing...
            ForceCount...
-           Edis ...
            Hip_Pos_Max...
            Hip_Pos_Min...
            IMU_LIVE...
@@ -72,12 +70,14 @@ persistent hip_pos_prev...
     %% Initialization and Hard Coded Values
     Ms = single(6.991429/2.205); % converted to kg
     Mf = single(0.55 + 1.643130/2.205); %carbon fiber foot + mechanism, kg
-    lt = single(0.3733); %meters
+    %lt = single(0.3733); %meters
     ls = single(0.3733); %meters
     la = single(0.0628); %meters
     lfx = single(-0.0071882); %meters
     lfy = single(0.00338582); %meters
-   
+    lc = single(2.00914e-5); %meters
+    g = 9.81; %meters/s^2;
+    
     COPFX = single(0);
     U_LIN_DAMP_A = single(0);
     U_S_KNEE = single(0);
@@ -140,7 +140,7 @@ persistent hip_pos_prev...
     Mmat=[(1/4).*lt.^2.*Ms+Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2))).^2+Mf.*(lfx+(-1).*ls.*sin(x(2))).^2,(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2)));(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2))),lfx.^2.*Mf+(lfy+(-1).*ls+lt).^2.*Mf];
     Cmat=[ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*x(4),ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*(x(3)+x(4));ls.*Mf.*(lfx.*cos(x(2))+(lfy+(-1).*ls+lt).*sin(x(2))).*x(3),0];
     Gmat=[g.*(lfx.*Mf.*cos(x(1)+x(2))+(ls.*Mf+(1/2).*lt.*Ms).*sin(x(1))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)));g.*(lfx.*Mf.*cos(x(1)+x(2))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)))];
-    JC=[lc+(-1).*ls+lt+ls.*cos(x(2)),(-1).*ls.*sin(x(2)),0,0,0,1;lc+(-1).*ls+lt,0,0,0,0,1];
+    JC=[lc+(-1).*ls+lt+ls.*cos(x(2)),(-1).*ls.*sin(x(2)),0,0,0,1;lc+(-1).*ls+lt,0,0,0,0,1]';
 
     % COPfx calc
     n = [0,1,0]';
@@ -155,7 +155,7 @@ persistent hip_pos_prev...
     COPfx = OC(1);
 
     L=((lt+ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).^2+(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2).^(1/2);
-    JL=[(-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2);(-1).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))];
+    JL=[(-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2);(-1).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))]';
     HL=[(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*((-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2+(-2).*(ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))),(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))));(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*lt.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))),(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).*((-1).*la.*ls.*cos(x(2))+(-1).*la.*lt.*cos(x(1)+x(2))+COPfx.*ls.*sin(x(2))+COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).^2)];
     Ldot=(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*((-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*x(3)+(-1).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).*x(4));
     
@@ -245,11 +245,14 @@ persistent hip_pos_prev...
         Knee_torque_command_stance = 0;
         Ankle_torque_command_stance = 0;
         %% Stance                
-        %Virtual linear spring
-        ML = pinv(JL/Mmat);
-        D = (-Cmat*x(3:4) - Gmat -JC*WC);
-        JLdot = x(3:4)'*HL;
-        u_s = -D + ML*JLdot*x(3:4) + pinv(ML*(JL/Mmat))/md*(-k*(deltaL)-d*Ldot);
+        %Virtual spring
+        if md<10
+           md = 10;
+        elseif md>10000
+            md = 10000;
+        end
+        D = (-Cmat*x(3:4) - Gmat -JC'*WC);
+        u_s = -D + pinv(md*(JL/Mmat))*(-x(3:4)'*HL*x(3:4)-k*(deltaL)-d*Ldot);
 
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
         U_S_KNEE = u_s(1);
@@ -258,11 +261,11 @@ persistent hip_pos_prev...
         Knee_torque_command_stance  = Knee_torque_command_stance + u_s(1); 
         Ankle_torque_command_stance = Ankle_torque_command_stance + u_s(2);
 
-        if KPBC_ON %Also use energy tracking controller              
-            u_pbc  = -JL*pbc_gain_knee*(Esys - Eref)*Ldot; 
+        if KPBC_ON %Also use energy tracking controller   
+            u_r  = -JL*pbc_gain_knee*(Esys - Eref)*Ldot; 
 
-            U_PBC_K = u_pbc(4); 
-            U_PBC_A = u_pbc(5);
+            U_PBC_K = u_r(1); 
+            U_PBC_A = u_r(2);
                          
             %Moving average filter and saturation laws on value and rate of torque       
             %Absolute saturation
