@@ -1,0 +1,14 @@
+%variables:
+% x - 4x1 array [knee pos, ankle pos, knee vel, ankle vel]
+% Knee axis treated as origin.
+% lt -thigh length 
+% ls -shank length
+% lfx, lfy - foot CoM x,y
+% lc - load cell y dist from ankle axis
+% la - ankle axis y dist to bottom of foot
+% COPfx - COP x distance from ankle p
+% Ms
+% Mf
+% 
+
+M=[(1/4).*lt.^2.*Ms+Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2))).^2+Mf.*(lfx+(-1).*ls.*sin(x(2))).^2,(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2)));(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2))),lfx.^2.*Mf+(lfy+(-1).*ls+lt).^2.*Mf];
