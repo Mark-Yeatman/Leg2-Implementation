@@ -1,5 +1,5 @@
 function [Knee_torque_command, Ankle_torque_command, deltaL, hip_pos, Esys, Esys_integrate_out,...
-        U_LIN_SPRING_K, U_LIN_SPRING_A, U_LIN_DAMP_K, U_LIN_DAMP_A, U_STOP_K, U_STOP_A, U_PBC_K,...
+        U_S_KNEE, U_S_ANKLE, COPFX, U_LIN_DAMP_A, U_STOP_K, U_STOP_A, U_PBC_K,...
         U_PBC_A, knee_des_out,ankle_des_out, foot_contact, stance, swing,phase_var_out,...
         IMU_LIVE_OUT,StanceGain,SwingGain,knee_joint_vel,ankle_joint_vel,hip_vel,PushOffOut]...
 = SLIP_KPBC(IMU_pitch, Knee_joint_position, Ankle_joint_position, ...
@@ -9,7 +9,7 @@ function [Knee_torque_command, Ankle_torque_command, deltaL, hip_pos, Esys, Esys
             kp_knee, kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,...
             vel_filter_coeff, KPBC_filter_coeff,...
             SLIP_ON, lt, k, d, L0, ...
-            KPBC_ON, KPBC_max_torque_rate , pbc_gain_knee, M, Eref,...
+            KPBC_ON, KPBC_max_torque_rate , pbc_gain_knee, md, Eref,...
             knee_stop_low, knee_stop_high, ankle_stop_low, ankle_stop_high,...
             max_torque,...
             v0, Fric_Comp, F_thresh,...
@@ -70,38 +70,20 @@ persistent hip_pos_prev...
     end
 
     %% Initialization and Hard Coded Values
-    %Knee_torque_command = 0; 
-    %Ankle_torque_command = 0; 
-    %deltaL = single(0); %meters
-    %Esys = single(0); %Joules
-    %g = single(9.81); %m/s^2
-    %pulse_length = single(10); %seconds
-    %hip_pos = 0; 
-    %t_out = 0; 
-    %dt = 0;
-    Mt = M;
     Ms = single(6.991429/2.205); % converted to kg
     Mf = single(0.55 + 1.643130/2.205); %carbon fiber foot + mechanism, kg
-    %lt = single(0.3733); %meters
+    lt = single(0.3733); %meters
     ls = single(0.3733); %meters
     la = single(0.0628); %meters
-    lf = single(0.15); %meters
-    px = single(0); %meters
-    py = single(0); %meters
-    params = [Mt, Ms, Mf, lt, ls, la, lf, px, py]; %From ordering in makeMatlabFunctionsProthesisTestBench
-    
-    Knee_torque_command= single(0);
-    Ankle_torque_command = single(0);
-    knee_des_out = nan;
-    ankle_des_out = nan;
-    
-    U_LIN_DAMP_K = single(0);
+    lfx = single(-0.0071882); %meters
+    lfy = single(0.00338582); %meters
+   
+    COPFX = single(0);
     U_LIN_DAMP_A = single(0);
-    U_LIN_SPRING_K = single(0);
-    U_LIN_SPRING_A = single(0);
+    U_S_KNEE = single(0);
+    U_S_ANKLE = single(0);
     U_PBC_K = single(0);
     U_PBC_A = single(0);
-    phase_var_out = single(0);
     
     % Position/velocity hard limits
     ANKLE_POS_MIN_LIM  = -35;
@@ -112,8 +94,6 @@ persistent hip_pos_prev...
     KNEE_POS_MAX_LIM = 105;
     KNEE_VEL_MIN_LIM = -400; %deg/s
     KNEE_VEL_MAX_LIM = 400; %deg/s
-
-    Edismax = 50; %joules
     
     %Winters Data Arrays
     a_knee=[-21.9472500000000,4.24525000000000,21.6720000000000,0;20.9295000000000,-6.97650000000000,7.71900000000000,0;15.9362500000000,-0.998250000000000,18.6640000000000,25.8830000000000;-59.8412500000000,13.6422500000000,64.8630000000000,0;-19.4405000000000,-1.40250000000000,38.4100000000000,-47.2960000000000;45.1070000000000,-7.15300000000000,0.456000000000000,0;1.42525000000000,0.0657500000000000,2.21000000000000,3.24500000000000];
@@ -134,25 +114,57 @@ persistent hip_pos_prev...
     ankle_vel = (1-vel_filter_coeff)*ankle_vel_prev + vel_filter_coeff*(ankle_pos-ankle_pos_prev)/dt;
     
     %Human Leg as a Robot states
-    x = zeros(10,1); %x,y,-knee ankle, ankle angle
-    x(4) =  -knee_pos; %reverse knee sign convention of biomechanics versus biped modeling     
-    x(5) =  ankle_pos;
+    x = zeros(4,1); 
+    x(1) =  knee_pos; %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
+    x(2) =  ankle_pos;
+    x(3) =  knee_vel; 
+    x(4) =  ankle_vel;
+       
+    %Notes:
+    % Knee axis treated as origin.
+    % Orientation of knee and ankle rotation is biomechanical
 
-    x(9) =  -knee_vel; %reverse knee sign convention of biomechanics versus biped modeling
-    x(10) =  ankle_vel;
-   
-    %Virtual linear spring from hip to foot, l1 is shank length, l2 is thigh length     
-    J = Spring_Jacobian_func(x,params);
-    L = Spring_Length_func(x,params);
+    %variables:
+    % x - 4x1 array [knee pos, ankle pos, knee vel, ankle vel]
+    % lt -thigh length 
+    % ls -shank length
+    % lfx, lfy - foot CoM x,y
+    % lc - load cell y dist from ankle axis
+    % la - ankle axis y dist to bottom of foot
+    % COPfx - COP distance along foot from ankle axis projection, to be
+    %   computed from load cell
+    % Ms - shank mass
+    % Mf - foot mass
+
+
+    Mmat=[(1/4).*lt.^2.*Ms+Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2))).^2+Mf.*(lfx+(-1).*ls.*sin(x(2))).^2,(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2)));(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2))),lfx.^2.*Mf+(lfy+(-1).*ls+lt).^2.*Mf];
+    Cmat=[ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*x(4),ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*(x(3)+x(4));ls.*Mf.*(lfx.*cos(x(2))+(lfy+(-1).*ls+lt).*sin(x(2))).*x(3),0];
+    Gmat=[g.*(lfx.*Mf.*cos(x(1)+x(2))+(ls.*Mf+(1/2).*lt.*Ms).*sin(x(1))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)));g.*(lfx.*Mf.*cos(x(1)+x(2))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)))];
+    JC=[lc+(-1).*ls+lt+ls.*cos(x(2)),(-1).*ls.*sin(x(2)),0,0,0,1;lc+(-1).*ls+lt,0,0,0,0,1];
+
+    % COPfx calc
+    n = [0,1,0]';
+    MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';
+    F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';
+    WC = [F;MA];
+    
+    OA = la*n;
+    M0 = (cross(OA,F)+MA);
+
+    OC = cross(n,M0)/dot(F,n);
+    COPfx = OC(1);
+
+    L=((lt+ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).^2+(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2).^(1/2);
+    JL=[(-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2);(-1).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))];
+    HL=[(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*((-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2+(-2).*(ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))),(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))));(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*lt.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))),(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).*((-1).*la.*ls.*cos(x(2))+(-1).*la.*lt.*cos(x(1)+x(2))+COPfx.*ls.*sin(x(2))+COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).^2)];
+    Ldot=(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*((-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*x(3)+(-1).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).*x(4));
+    
     deltaL = L - L0;
-    Ldot = Spring_vel_func(x,params);
     
     %Calculate system energy
-    %Ehip = 1/2*M*(Ldot^2) + (L-L0)*M*g; %kinetic and potential energy of slip model
     Espring = 1/2*k*deltaL^2; %virtual spring potential energy
-    KE = 1/2*M*(Ldot^2);%KE_func(x,params);
-    %PE = PE_func(x,params);
-    Esys = Espring + KE;%Espring + PE + KE;
+    KE = 1/2*md*(Ldot^2);     %virtual mass kinetic energy
+    Esys = Espring + KE;
     
     %Phase Variable 
     %s_a=clamp(1+(1-s_m)/(q_h_0-q_h_m)*(hip-q_h_0),0,1);
@@ -234,26 +246,25 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual linear spring
-        u_lin_spring = -k.*(deltaL).*J;     
-        u_lin_damp = -d.*(Ldot).*J;
+        ML = pinv(JL/Mmat);
+        D = (-Cmat*x(3:4) - Gmat -JC*WC);
+        JLdot = x(3:4)'*HL;
+        u_s = -D + ML*JLdot*x(3:4) + pinv(ML*(JL/Mmat))/md*(-k*(deltaL)-d*Ldot);
 
-        U_LIN_DAMP_K = -u_lin_damp(4);
-        U_LIN_DAMP_A = u_lin_damp(5);
-        U_LIN_SPRING_K = -u_lin_spring(4);
-        U_LIN_SPRING_A = u_lin_spring(5);
+        %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
+        U_S_KNEE = u_s(1);
+        U_S_ANKLE = u_s(2);
 
-        Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; %reverse knee sign convention of biomechanics versus biped modeling
-        Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;
+        Knee_torque_command_stance  = Knee_torque_command_stance + u_s(1); 
+        Ankle_torque_command_stance = Ankle_torque_command_stance + u_s(2);
 
-        if KPBC_ON %Also use energy tracking controller   
-            u_pbc = single(zeros(5,1));
-            
-            u_pbc  = -J*pbc_gain_knee*(Esys - Eref)*Ldot; 
+        if KPBC_ON %Also use energy tracking controller              
+            u_pbc  = -JL*pbc_gain_knee*(Esys - Eref)*Ldot; 
 
-            U_PBC_K = -u_pbc(4); %THE SIGN NEEDS TO BE CHANGED IF USING SPRING VERSUS JOINT LEVEL BECAUSE OF BIO VS ROBOT KNEE CORDS
+            U_PBC_K = u_pbc(4); 
             U_PBC_A = u_pbc(5);
                          
-            %moving average filter and saturation laws on value and rate of torque       
+            %Moving average filter and saturation laws on value and rate of torque       
             %Absolute saturation
             if KPBC_max_torque>0
                 U_PBC_K = Saturate(U_PBC_K,-KPBC_max_torque,KPBC_max_torque);
@@ -268,7 +279,7 @@ persistent hip_pos_prev...
                 U_PBC_K = dk*dt+u_pbc_knee_prev;
                 U_PBC_A = da*dt+u_pbc_ankle_prev;
             end           
-            %exponential smoothing of torque
+            %Exponential smoothing of torque
             U_PBC_K = (1-KPBC_filter_coeff)*u_pbc_knee_prev + KPBC_filter_coeff*U_PBC_K;
             U_PBC_A = (1-KPBC_filter_coeff)*u_pbc_ankle_prev + KPBC_filter_coeff*U_PBC_A;
             
@@ -283,11 +294,7 @@ persistent hip_pos_prev...
                     U_PBC_K = 0;
                 end
             end
-            
-            %cancel damping term during KPBC
-            Knee_torque_command_stance = Knee_torque_command_stance + U_PBC_K - U_LIN_DAMP_K;
-            Ankle_torque_command_stance = Ankle_torque_command_stance + U_PBC_A - U_LIN_DAMP_A;
-            
+                      
         end
         %% Swing
         if IMU_LIVE
