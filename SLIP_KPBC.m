@@ -113,6 +113,23 @@ persistent hip_pos_prev...
     knee_vel = (1-vel_filter_coeff)*knee_vel_prev + vel_filter_coeff*(knee_pos-knee_pos_prev)/dt;
     ankle_vel = (1-vel_filter_coeff)*ankle_vel_prev + vel_filter_coeff*(ankle_pos-ankle_pos_prev)/dt;
     
+    %% Determine foot contact
+    if norm([Load_cell_x_force, Load_cell_y_force, Load_cell_z_force],2) > F_thresh
+        ForceCount = ForceCount+1;
+        if ForceCount > 2
+            FootContact = true;
+        else
+            FootContact = false;
+        end
+    else
+        FootContact = false;
+        ForceCount = 0;   
+    end
+             
+    StanceGain = 0;
+    SwingGain = 0;
+    t_hold = 0.3;
+    
     %Human Leg as a Robot states
     x = zeros(4,1); 
     x(1) =  knee_pos; %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
@@ -136,7 +153,6 @@ persistent hip_pos_prev...
     % Ms - shank mass
     % Mf - foot mass
 
-
     Mmat=[(1/4).*lt.^2.*Ms+Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2))).^2+Mf.*(lfx+(-1).*ls.*sin(x(2))).^2,(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2)));(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2))),lfx.^2.*Mf+(lfy+(-1).*ls+lt).^2.*Mf];
     Cmat=[ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*x(4),ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*(x(3)+x(4));ls.*Mf.*(lfx.*cos(x(2))+(lfy+(-1).*ls+lt).*sin(x(2))).*x(3),0];
     Gmat=[g.*(lfx.*Mf.*cos(x(1)+x(2))+(ls.*Mf+(1/2).*lt.*Ms).*sin(x(1))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)));g.*(lfx.*Mf.*cos(x(1)+x(2))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)))];
@@ -149,14 +165,16 @@ persistent hip_pos_prev...
     WC = [F;MA];
     
     OA = la*n;
-    M0 = (cross(OA,F)+MA);
+    M0 = (cross(-OA,F)+MA);
 
     OC = cross(n,M0)/dot(F,n);
     COPfx = OC(1);
     %(-2,8) inches
+    if ~FootContact
+        COPfx = (0.2032 - 0.0508)/2;
+    end
     COPfx = Saturate(COPfx,-0.0508,0.2032); %meters
     COPFX = COPfx;
-    
     L=((lt+ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).^2+(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2).^(1/2);
     JL=[(-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2);(-1).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))]';
     HL=[(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*((-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2+(-2).*(ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))),(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))));(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*lt.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))),(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).*((-1).*la.*ls.*cos(x(2))+(-1).*la.*lt.*cos(x(1)+x(2))+COPfx.*ls.*sin(x(2))+COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).^2)];
@@ -176,23 +194,6 @@ persistent hip_pos_prev...
     
     %IMU State check
     IMU_LIVE = abs(hip_pos_prev-hip_pos)<1;
-   
-    %% Determine foot contact
-    if norm([Load_cell_x_force, Load_cell_y_force, Load_cell_z_force],2) > F_thresh
-        ForceCount = ForceCount+1;
-        if ForceCount > 2
-            FootContact = true;
-        else
-            FootContact = false;
-        end
-    else
-        FootContact = false;
-        ForceCount = 0;   
-    end
-             
-    StanceGain = 0;
-    SwingGain = 0;
-    t_hold = 0.3;
     
     %% Phase State management, set autodetection or command stance/swing
     if int8(Command_State) == int8(0)
