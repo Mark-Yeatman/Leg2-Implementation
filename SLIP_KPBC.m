@@ -267,11 +267,11 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual spring
-        z_tilde = [Theta-Theta_ref;L-L0];
-        K = diag([k,k]);
-        D = diag([d,d]);
-        M_J_L_inv = pinv((J_L/M));
-        u_s = C*qdot + G + M_J_L_inv*(J_z_dot*qdot + M_z\(-K*z_tilde - D*z_dot));
+        %z_tilde = [Theta-Theta_ref;L-L0];
+        %K = diag([k,k]);
+        %D = diag([d,d]);
+        %M_J_L_inv = pinv((J_L/M));
+        u_s = C*qdot + G + (M/M_z)*(-K*z_tilde - D*z_dot);
 
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
         U_S_KNEE = u_s(1);

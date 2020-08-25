@@ -68,18 +68,20 @@ persistent hip_pos_prev...
     end
 
     %% Initialization and Hard Coded Values
-    Ms = single(6.991429/2.205); % converted to kg
-    Mf = single(0.55 + 1.643130/2.205); %carbon fiber foot + mechanism, kg
+    %params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
+    Ms = single(6.991429/2.205); % converted lb to kg
+    Mf = single(1.643130/2.205); % converted lb to kg
+    Isz = single(0.02592934); %kg*m^2
+    Ifz = single(0.0024078341); %kg*m^2
     %lt = single(0.3733); %meters
     ls = single(0.3733); %meters
+    rs = single(0.1705526434); %meters
     la = single(0.0628); %meters
-    lfx = single(-0.0071882); %meters
-    lfy = single(0.00338582); %meters
+    rfx = single(0.027510613); %meters
+    rfy = single(0.0335); %meters
     lc = single(2.00914e-5); %meters
     g = 9.81; %meters/s^2;
-    
-
-    
+      
     COPFX = single(0);
     U_LIN_DAMP_A = single(0);
     U_S_KNEE = single(0);
@@ -185,7 +187,17 @@ persistent hip_pos_prev...
     J_z = [J_L;J_Theta];
     J_z_dot = [J_dot_L;J_dot_Theta];      
     J_C = J_C_func(x,params);   
+    
+    qdot = x(3:4);
     deltaL = L - L0;
+    z_dot = J_z*qdot;
+    Ldot = z_dot(1);
+    if md<10
+       md = 10;
+    elseif md>10000
+        md = 10000;
+    end
+    M_z = diag([md,md]);
     
     %Calculate system energy
     Espring = 1/2*k*deltaL^2; %virtual spring potential energy
@@ -255,19 +267,11 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual spring
-        if md<10
-           md = 10;
-        elseif md>10000
-            md = 10000;
-        end
-        qdot = x(3:4);
-        M_z_inv = inv(diag([md,md]));
-        z_tilde = [Theta-Theta_ref;L-L0];
-        z_tide_dot = J_z*x(3:4); 
-        K = diag([k,k]);
-        D = diag([d,d]);
-        M_J_L_inv = pinv((J_L/M));
-        u_s = C*qdot + G + M_J_L_inv*(J_z_dot*qdot + M_z\(-K*z_tilde - D*z_tide_dot));
+        %z_tilde = [Theta-Theta_ref;L-L0];
+        %K = diag([k,k]);
+        %D = diag([d,d]);
+        %M_J_L_inv = pinv((J_L/M));
+        u_s = C*qdot + G + (M/M_z)*(-K*z_tilde - D*z_dot));
 
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
         U_S_KNEE = u_s(1);
@@ -279,7 +283,7 @@ persistent hip_pos_prev...
         if KPBC_ON %Also use energy tracking controller   
             Omega = diag([1,0]);
             kappa = pbc_gain_knee;
-            u_r  = -J_L*pbc_gain_knee*(Esys - Eref)*Ldot; 
+            u_r  = -kappa*(Esys - Eref)*M_J_L_inv*Omega*Ldot; 
 
             U_PBC_K = u_r(1); 
             U_PBC_A = u_r(2);
