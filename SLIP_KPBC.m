@@ -68,18 +68,20 @@ persistent hip_pos_prev...
     end
 
     %% Initialization and Hard Coded Values
-    Ms = single(6.991429/2.205); % converted to kg
-    Mf = single(0.55 + 1.643130/2.205); %carbon fiber foot + mechanism, kg
+    %params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
+    Ms = single(6.991429/2.205); % converted lb to kg
+    Mf = single(1.643130/2.205); % converted lb to kg
+    Isz = single(0.02592934); %kg*m^2
+    Ifz = single(0.0024078341); %kg*m^2
     %lt = single(0.3733); %meters
     ls = single(0.3733); %meters
+    rs = single(0.1705526434); %meters
     la = single(0.0628); %meters
-    lfx = single(-0.0071882); %meters
-    lfy = single(0.00338582); %meters
+    rfx = single(0.027510613); %meters
+    rfy = single(0.0335); %meters
     lc = single(2.00914e-5); %meters
     g = 9.81; %meters/s^2;
-    
-
-    
+      
     COPFX = single(0);
     U_LIN_DAMP_A = single(0);
     U_S_KNEE = single(0);
