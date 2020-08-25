@@ -1,0 +1,1 @@
+Cmat=[(-1).*(ls+(-1).*lt).*Mf.*(rfx.*cos(x(2))+(lt+rfy).*sin(x(2))).*x(4),(-1).*(ls+(-1).*lt).*Mf.*(rfx.*cos(x(2))+(lt+rfy).*sin(x(2))).*(x(3)+x(4));(ls+(-1).*lt).*Mf.*(rfx.*cos(x(2))+(lt+rfy).*sin(x(2))).*x(3),0];

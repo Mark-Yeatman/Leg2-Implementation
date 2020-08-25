@@ -78,6 +78,8 @@ persistent hip_pos_prev...
     lc = single(2.00914e-5); %meters
     g = 9.81; %meters/s^2;
     
+
+    
     COPFX = single(0);
     U_LIN_DAMP_A = single(0);
     U_S_KNEE = single(0);
@@ -153,34 +155,47 @@ persistent hip_pos_prev...
     % Ms - shank mass
     % Mf - foot mass
 
-    Mmat=[(1/4).*lt.^2.*Ms+Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2))).^2+Mf.*(lfx+(-1).*ls.*sin(x(2))).^2,(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2)));(lfy+(-1).*ls+lt).*Mf.*(lfy+(-1).*ls+lt+ls.*cos(x(2)))+lfx.*Mf.*(lfx+(-1).*ls.*sin(x(2))),lfx.^2.*Mf+(lfy+(-1).*ls+lt).^2.*Mf];
-    Cmat=[ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*x(4),ls.*Mf.*((-1).*lfx.*cos(x(2))+(-1).*(lfy+(-1).*ls+lt).*sin(x(2))).*(x(3)+x(4));ls.*Mf.*(lfx.*cos(x(2))+(lfy+(-1).*ls+lt).*sin(x(2))).*x(3),0];
-    Gmat=[g.*(lfx.*Mf.*cos(x(1)+x(2))+(ls.*Mf+(1/2).*lt.*Ms).*sin(x(1))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)));g.*(lfx.*Mf.*cos(x(1)+x(2))+(lfy+(-1).*ls+lt).*Mf.*sin(x(1)+x(2)))];
-    JC=[lc+(-1).*ls+lt+ls.*cos(x(2)),(-1).*ls.*sin(x(2)),0,0,0,1;lc+(-1).*ls+lt,0,0,0,0,1]';
-
     % COPfx calc
     n = [0,1,0]';
     MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';
     F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';
-    WC = [F;MA];
-    
+    WC = [F;MA];   
     OA = la*n;
     M0 = (cross(-OA,F)+MA);
-
     OC = cross(n,M0)/dot(F,n);
-    COPfx = OC(1);
-    %(-2,8) inches
+    COPfx = OC(1);        
     if ~FootContact
-        COPfx = (0.2032 - 0.0508)/2;
+        %(-2,8) inches
+        COPfx = (0.2032 - 0.0508)/2; %meters
     end
     COPfx = Saturate(COPfx,-0.0508,0.2032); %meters
     COPFX = COPfx;
-    L=((lt+ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).^2+(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2).^(1/2);
-    JL=[(-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2);(-1).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))]';
-    HL=[(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*((-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).^2+(-2).*(ls.*cos(x(1))+la.*cos(x(1)+x(2))+(-1).*COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))),(1/2).*lt.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))));(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*lt.*((-1).*la.*cos(x(1)+x(2))+COPfx.*sin(x(1)+x(2))).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2)))+(-2).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2)))),(1/2).*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-3/2).*(2.*(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).*((-1).*la.*ls.*cos(x(2))+(-1).*la.*lt.*cos(x(1)+x(2))+COPfx.*ls.*sin(x(2))+COPfx.*lt.*sin(x(1)+x(2)))+(-2).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).^2)];
-    Ldot=(COPfx.^2+la.^2+ls.^2+lt.^2+2.*ls.*lt.*cos(x(1))+2.*la.*ls.*cos(x(2))+2.*la.*lt.*cos(x(1)+x(2))+(-2).*COPfx.*ls.*sin(x(2))+(-2).*COPfx.*lt.*sin(x(1)+x(2))).^(-1/2).*((-1).*lt.*(COPfx.*cos(x(1)+x(2))+ls.*sin(x(1))+la.*sin(x(1)+x(2))).*x(3)+(-1).*(COPfx.*ls.*cos(x(2))+COPfx.*lt.*cos(x(1)+x(2))+la.*ls.*sin(x(2))+la.*lt.*sin(x(1)+x(2))).*x(4));
     
+    params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
+   
+    M = M_func(x,params);
+    C = C_func(x,params);
+    G = G_func(x,params);    
+    L = L_func(x,params);
+    J_L = J_L_func(x,params);
+    J_dot_L = J_dot_L_func(x,params);    
+    Theta = Theta_func(x,params);
+    J_Theta = J_Theta_func(x,params);
+    J_dot_Theta = J_dot_Theta_func(x,params);   
+    J_z = [J_L;J_Theta];
+    J_z_dot = [J_dot_L;J_dot_Theta];      
+    J_C = J_C_func(x,params);   
+    
+    qdot = x(3:4);
     deltaL = L - L0;
+    z_dot = J_z*qdot;
+    Ldot = z_dot(1);
+    if md<10
+       md = 10;
+    elseif md>10000
+        md = 10000;
+    end
+    M_z = diag([md,md]);
     
     %Calculate system energy
     Espring = 1/2*k*deltaL^2; %virtual spring potential energy
@@ -250,13 +265,11 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual spring
-        if md<10
-           md = 10;
-        elseif md>10000
-            md = 10000;
-        end
-        D = (-Cmat*x(3:4) - Gmat -JC'*WC);
-        u_s = -D + pinv(md*(JL/Mmat))*(-x(3:4)'*HL*x(3:4)-k*(deltaL)-d*Ldot);
+        z_tilde = [Theta-Theta_ref;L-L0];
+        K = diag([k,k]);
+        D = diag([d,d]);
+        M_J_L_inv = pinv((J_L/M));
+        u_s = C*qdot + G + M_J_L_inv*(J_z_dot*qdot + M_z\(-K*z_tilde - D*z_dot));
 
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
         U_S_KNEE = u_s(1);
@@ -266,7 +279,9 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = Ankle_torque_command_stance + u_s(2);
 
         if KPBC_ON %Also use energy tracking controller   
-            u_r  = -JL*pbc_gain_knee*(Esys - Eref)*Ldot; 
+            Omega = diag([1,0]);
+            kappa = pbc_gain_knee;
+            u_r  = -kappa*(Esys - Eref)*M_J_L_inv*Omega*Ldot; 
 
             U_PBC_K = u_r(1); 
             U_PBC_A = u_r(2);
@@ -402,38 +417,6 @@ function [Knee_torque_command,Ankle_torque_command] = PDControl(kp_k, kd_k, q_ks
     Knee_torque_command = kp_k*(q_kstar - q_k) + kd_k*(-qdot_k);
     Ankle_torque_command = kp_a*(q_astar - q_a) + kd_a*(-qdot_a);
 end
-function l1dot = Spring_vel_func(in1,in2)
-%SPRING_VEL_FUNC
-%    L1DOT = SPRING_VEL_FUNC(IN1,IN2)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:44
-
-%Prosthesis file. Needs state and parameters as inputs
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-px = in2(:,8);
-py = in2(:,9);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-x8 = in1(8,:);
-x9 = in1(9,:);
-x10 = in1(10,:);
-t2 = cosd(x3);
-t3 = sind(x3);
-t4 = x3+x4;
-t5 = x8+x9;
-t6 = cosd(t4);
-t7 = sind(t4);
-t8 = t4+x5;
-t9 = t5+x10;
-t10 = cosd(t8);
-t11 = sind(t8);
-l1dot = (1.0./sqrt((py+la.*t10-lf.*t11+ls.*t6+lt.*t2).^2+(-px+la.*t11+lf.*t10+ls.*t7+lt.*t3).^2).*((la.*t9.*t10-lf.*t9.*t11+ls.*t5.*t6+lt.*t2.*x8).*(px.*-2.0+la.*t11.*2.0+lf.*t10.*2.0+ls.*t7.*2.0+lt.*t3.*2.0)-(la.*t9.*t11+lf.*t9.*t10+ls.*t5.*t7+lt.*t3.*x8).*(py.*2.0+la.*t10.*2.0-lf.*t11.*2.0+ls.*t6.*2.0+lt.*t2.*2.0)))./2.0;
-end
 function y = Saturate(x,L1,L2)
     %Function to prevent the desired joint angles from changing to fast. 
     %Works via saturation
@@ -465,276 +448,6 @@ elseif x<b
 else
     y=1;
 end
-end
-function l1 = Spring_Length_func(in1,in2)
-%SPRING_LENGTH_FUNC
-%    L1 = SPRING_LENGTH_FUNC(IN1,IN2)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:42
-
-%Prosthesis file. Needs state and parameters as inputs
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-px = in2(:,8);
-py = in2(:,9);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-t2 = x3+x4;
-t3 = t2+x5;
-t4 = cosd(t3);
-t5 = sind(t3);
-l1 = sqrt((-px+la.*t5+lf.*t4+ls.*sind(t2)+lt.*sind(x3)).^2+(py+la.*t4-lf.*t5+ls.*cosd(t2)+lt.*cosd(x3)).^2);
-end
-function lJacob = Spring_Jacobian_func(in1,in2)
-%SPRING_JACOBIAN_FUNC
-%    LJACOB = SPRING_JACOBIAN_FUNC(IN1,IN2)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:45
-
-%Prosthesis file. Needs state and parameters as inputs
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-px = in2(:,8);
-py = in2(:,9);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-t2 = cosd(x3);
-t3 = sind(x3);
-t4 = la.*py;
-t5 = lf.*px;
-t6 = x3+x4;
-t7 = x4+x5;
-t15 = -px;
-t8 = lt.*t2;
-t9 = cosd(t6);
-t10 = cosd(t7);
-t11 = lt.*t3;
-t12 = sind(t6);
-t13 = sind(t7);
-t14 = t6+x5;
-t18 = -t5;
-t16 = cosd(t14);
-t17 = sind(t14);
-t19 = ls.*t9;
-t20 = ls.*t12;
-t23 = lf.*lt.*t10;
-t27 = la.*lt.*t13;
-t32 = t4+t18;
-t21 = la.*t17;
-t22 = lf.*t17;
-t24 = px.*t19;
-t25 = la.*t16;
-t26 = lf.*t16;
-t28 = py.*t20;
-t33 = t17.*t32;
-t29 = px.*t25;
-t30 = py.*t26;
-t31 = -t22;
-t35 = t11+t15+t20+t21+t26;
-t34 = py+t8+t19+t25+t31;
-t37 = t35.^2;
-t36 = t34.^2;
-t38 = t36+t37;
-t39 = 1.0./sqrt(t38);
-lJacob = [0.0;0.0;-t39.*(t24+t28+t29+t30+t33+px.*t8+py.*t11);-t39.*(t23+t24+t27+t28+t33+t16.*(la.*px+lf.*py)+ls.*lt.*sind(x4));-t39.*(t23+t27+t29+t30+t33+lf.*ls.*cosd(x5)+la.*ls.*sind(x5))];
-end
-function Pe = PE_func(in1,in2)
-%PE_FUNC
-%    PE = PE_FUNC(IN1,IN2)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:41
-
-%Prosthesis file. Needs state and parameters as inputs
-Mf = in2(:,3);
-Ms = in2(:,2);
-Mt = in2(:,1);
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-x2 = in1(2,:);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-t2 = Mf.*2.0;
-t3 = x3+x4+x5;
-Pe = x2.*(Mf.*4.0+Ms.*4.0+Mt.*4.0).*(9.81e+2./4.0e+2)+Mf.*lf.*sind(t3).*(9.81e+2./4.0e+2)-lt.*cosd(x3).*(Ms.*2.0+Mt+t2).*(9.81e+2./2.0e+2)-ls.*cosd(x3+x4).*(Ms+t2).*(9.81e+2./2.0e+2)-Mf.*la.*cosd(t3).*(9.81e+2./2.0e+2);
-end
-function Ke = KE_func(in1,in2)
-%KE_FUNC
-%    KE = KE_FUNC(IN1,IN2)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:40
-
-%Prosthesis file. Needs state and parameters as inputs
-Mf = in2(:,3);
-Ms = in2(:,2);
-Mt = in2(:,1);
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-x6 = in1(6,:);
-x7 = in1(7,:);
-x8 = in1(8,:);
-x9 = in1(9,:);
-x10 = in1(10,:);
-t2 = cosd(x3);
-t3 = cosd(x4);
-t4 = cosd(x5);
-t5 = sind(x3);
-t6 = sind(x4);
-t7 = sind(x5);
-t8 = x3+x4;
-t9 = x4+x5;
-t10 = lt.^2;
-t20 = -lf;
-t24 = la./2.0;
-t25 = ls./2.0;
-t11 = t2.^2;
-t12 = t5.^2;
-t13 = ls.*t4;
-t14 = lt.*t3;
-t15 = cosd(t8);
-t16 = cosd(t9);
-t17 = sind(t8);
-t18 = sind(t9);
-t19 = t8+x5;
-t23 = ls.*t7.*4.0;
-t35 = (Mt.*lt.*t5)./2.0;
-t39 = (Mt.*lt.*t2)./2.0;
-t21 = cosd(t19);
-t22 = sind(t19);
-t26 = t15.^2;
-t27 = t17.^2;
-t28 = lt.*t16;
-t29 = -t23;
-t30 = Mt.*t11;
-t31 = Mt.*t12;
-t33 = lt.*t18.*4.0;
-t42 = Ms.*lt.*t6.*t15;
-t43 = Ms.*lt.*t6.*t17;
-t44 = Ms.*t15.*t25;
-t45 = t13+t24;
-t46 = t14+t25;
-t47 = Ms.*t17.*t25;
-t32 = t21.^2;
-t34 = t22.^2;
-t36 = lf+t29;
-t37 = Ms.*t26;
-t38 = Ms.*t27;
-t48 = Mf.*t21.*t24;
-t49 = (Mf.*lf.*t21)./4.0;
-t50 = Mf.*t22.*t24;
-t51 = (Mf.*lf.*t22)./4.0;
-t52 = -t42;
-t55 = Ms.*t15.*t46;
-t56 = Ms.*t17.*t46;
-t57 = t28+t45;
-t58 = Mf.*t24.*t45;
-t59 = Ms.*t25.*t46;
-t60 = t20+t23+t33;
-t61 = Mf.*t21.*t45;
-t62 = Mf.*t22.*t45;
-t40 = Mf.*t32;
-t41 = Mf.*t34;
-t53 = -t51;
-t54 = (Mf.*lf.*t36)./1.6e+1;
-t63 = (Mf.*t21.*t36)./4.0;
-t64 = (Mf.*t22.*t36)./4.0;
-t66 = Mf.*t24.*t57;
-t67 = Mf.*t21.*t57;
-t68 = Mf.*t22.*t57;
-t69 = t49+t50;
-t70 = (Mf.*lf.*t60)./1.6e+1;
-t73 = (Mf.*t21.*t60)./4.0;
-t74 = (Mf.*t22.*t60)./4.0;
-t76 = Mf.*t45.*t57;
-t77 = (Mf.*t36.*t60)./1.6e+1;
-t65 = -t64;
-t71 = t48+t53;
-t72 = -t70;
-t75 = -t73;
-t78 = -t77;
-t79 = t54+t58;
-t80 = t47+t62+t63;
-t82 = t30+t31+t37+t38+t40+t41;
-t85 = t39+t43+t55+t67+t74;
-t81 = t44+t61+t65;
-t83 = t66+t72;
-t84 = t59+t76+t78;
-t86 = t35+t52+t56+t68+t75;
-Ke = (x9.*(t80.*x7+t81.*x6+t79.*x10+t84.*x8+x9.*((Ms.*ls.^2)./4.0+(Mf.*t36.^2)./1.6e+1+Mf.*t45.^2)))./2.0+(x8.*(-x10.*(t70-(Mf.*la.*t57)./2.0)+t85.*x6+t84.*x9+t86.*x7+x8.*((Mt.*t10)./4.0+Mf.*t57.^2+(Mf.*t60.^2)./1.6e+1+Ms.*t46.^2+Ms.*t6.^2.*t10)))./2.0+(x6.*(t71.*x10+t82.*x6+t81.*x9+t85.*x8))./2.0+(x7.*(t69.*x10+t80.*x9+t82.*x7+t86.*x8))./2.0+(x10.*(x10.*((Mf.*la.^2)./4.0+(Mf.*lf.^2)./1.6e+1)-x8.*(t70-(Mf.*la.*t57)./2.0)+t69.*x7+t71.*x6+t79.*x9))./2.0;
-end
-function GShape = G_Shape_Law_func(in1,in2,xshift)
-%G_SHAPE_LAW_FUNC
-%    GSHAPE = G_SHAPE_LAW_FUNC(IN1,IN2,XSHIFT)
-
-%    This function was generated by the Symbolic Math Toolbox version 8.3.
-%    31-Jan-2020 14:49:33
-
-%Prosthesis file. Needs state and parameters as inputs
-Mf = in2(:,3);
-Ms = in2(:,2);
-Mt = in2(:,1);
-la = in2(:,6);
-lf = in2(:,7);
-ls = in2(:,5);
-lt = in2(:,4);
-x3 = in1(3,:);
-x4 = in1(4,:);
-x5 = in1(5,:);
-t2 = Mf.*2.0;
-t4 = xshift./2.0;
-t3 = Ms+t2;
-t5 = sind(t4);
-t6 = t4+x3+x4;
-t7 = cosd(t6);
-t8 = t6+x5;
-t9 = cosd(t8);
-t10 = sind(t8);
-t14 = ls.*t3.*t7.*2.0;
-t11 = lf.*t10;
-t12 = la.*t9.*2.0;
-t13 = -t11;
-t15 = t12+t13;
-GShape = [0.0;0.0;t5.*(t14-Mf.*(t11-t12)+lt.*cosd(t4+x3).*(Ms+Mt+t3).*2.0).*(-9.81e+2./2.0e+2);t5.*(t14+Mf.*t13+la.*t2.*t9).*(-9.81e+2./2.0e+2);Mf.*t5.*(t11-t12).*(9.81e+2./2.0e+2)];
-end
-function [y,dy] = spline3(x,y0,dy0,y1,dy1)
-%x is spline input parameter between 0 and 1
-% y0 and y1 are the position start and finish
-% dy0 and dy1 are the velocity start and finish
-    a0=y0;
-    a1=dy0;
-    a2=3*y1-3*y0-2*dy0-dy1;
-    a3=-2*y1+2*y0+dy0+dy1;
-    if x<0
-        y=y0;
-        dy=dy0;
-    elseif x>1
-        y=y1;
-        dy=dy1;
-    else
-        y=a0+a1*x+a2*x.^2+a3*x.^3;
-        dy=a1+2*a2*x+3*a3*x.^2;
-    end
-end
-function cop = COP(F)
-   %F is a 6 element wrench giving the  x,y,z force and x,y,z, axis moments
-   cop = 0;
 end
 function [knee_r,dknee_r,ankle_r,dankle_r] = winterFit(n,a_knee,a_ankle,knee_ind,ankle_ind)
 m1=2;

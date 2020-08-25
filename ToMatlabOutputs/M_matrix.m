@@ -1,0 +1,1 @@
+M=[Ifz+Isz+Ms.*rs.^2+Mf.*(lt+rfy+(ls+(-1).*lt).*cos(x(2))).^2+Mf.*(rfx+((-1).*ls+lt).*sin(x(2))).^2,Ifz+Mf.*(lt+rfy).*(lt+rfy+(ls+(-1).*lt).*cos(x(2)))+Mf.*rfx.*(rfx+((-1).*ls+lt).*sin(x(2)));Ifz+Mf.*(lt+rfy).*(lt+rfy+(ls+(-1).*lt).*cos(x(2)))+Mf.*rfx.*(rfx+((-1).*ls+lt).*sin(x(2))),Ifz+Mf.*rfx.^2+Mf.*(lt+rfy).^2];
