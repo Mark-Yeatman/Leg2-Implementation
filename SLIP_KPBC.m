@@ -42,7 +42,8 @@ persistent hip_pos_prev...
            PushOff...
            u_pbc_knee_prev...
            u_pbc_ankle_prev...
-           %t_switched_swing... %implement swing setpoint switching hold?
+           COP_prev
+       %t_switched_swing... %implement swing setpoint switching hold?
        
     if isempty(knee_pos_prev)
         hip_pos_prev = IMU_pitch;
@@ -65,6 +66,7 @@ persistent hip_pos_prev...
         Hip_Pos_Min = -20;
         IMU_LIVE = true;
         PushOff = false;
+        COP_prev = -0.0508;
     end
 
     %% Initialization and Hard Coded Values
@@ -158,6 +160,8 @@ persistent hip_pos_prev...
     % Mf - foot mass
 
     % COPfx calc
+    COP_lim_up = single(0.06);  %from pilot walking trials
+    COP_lim_down = single(-0.0508);
     n = [0,0,1]';
     MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';
     F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';
@@ -168,9 +172,17 @@ persistent hip_pos_prev...
     COPfx = OC(1);        
     if ~FootContact
         %(-2,8) inches
-        COPfx = (0.2032 - 0.0508)/2; %meters
+        COPfx = COP_lim_down;
+        COP_prev = COP_lim_down;
+    else
+        %only allow the COP to progress forwards
+        if COPfx<COP_prev
+            COPfx = COP_prev;
+        else
+            COP_prev = COPfx;
+        end
     end
-    COPfx = Saturate(COPfx,-0.0508,0.2032); %meters
+    COPfx = Saturate(COPfx,COP_lim_down,COP_lim_up); %meters
     COPFX = COPfx;
     
     params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
@@ -190,8 +202,7 @@ persistent hip_pos_prev...
     
     qdot = x(3:4);
     deltaL = L - L0;
-    z_dot = J_z*qdot;
-    Ldot = z_dot(1);
+    Ldot = J_L*qdot;
     if md<10
        md = 10;
     elseif md>10000
@@ -268,13 +279,13 @@ persistent hip_pos_prev...
         %% Stance                
         %Virtual spring
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
-        u_lin_spring = -k.*(deltaL).*J_L;     
-        u_lin_damp = -d.*(Ldot).*J_L;
+        u_lin_spring = -k.*(deltaL).*J_L';     
+        u_lin_damp = -d.*(Ldot).*J_L';
 
-        U_LIN_DAMP_K = -u_lin_damp(4);
-        U_LIN_DAMP_A = u_lin_damp(5);
-        U_LIN_SPRING_K = -u_lin_spring(4);
-        U_LIN_SPRING_A = u_lin_spring(5);
+        U_LIN_DAMP_K = u_lin_damp(1);
+        U_LIN_DAMP_A = u_lin_damp(2);
+        U_LIN_SPRING_K = u_lin_spring(1);
+        U_LIN_SPRING_A = u_lin_spring(2);
 
         Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; 
         Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;
@@ -316,7 +327,8 @@ persistent hip_pos_prev...
                     U_PBC_K = 0;
                 end
             end
-                      
+            Knee_torque_command_stance = Knee_torque_command_stance + U_PBC_K - U_LIN_DAMP_K;
+            Ankle_torque_command_stance = Ankle_torque_command_stance + U_PBC_A - U_LIN_DAMP_A;          
         end
         %% Swing
         Knee_torque_command_swing=0;
