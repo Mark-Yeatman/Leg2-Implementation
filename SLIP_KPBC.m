@@ -158,7 +158,7 @@ persistent hip_pos_prev...
     % Mf - foot mass
 
     % COPfx calc
-    n = [0,1,0]';
+    n = [0,0,1]';
     MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';
     F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';
     WC = [F;MA];   
@@ -175,18 +175,18 @@ persistent hip_pos_prev...
     
     params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
    
-    M = M_func(x,params);
-    C = C_func(x,params);
-    G = G_func(x,params);    
+%     M = M_func(x,params);
+%     C = C_func(x,params);
+%     G = G_func(x,params);    
     L = L_func(x,params);
     J_L = J_L_func(x,params);
-    J_dot_L = J_dot_L_func(x,params);    
-    Theta = Theta_func(x,params);
-    J_Theta = J_Theta_func(x,params);
-    J_dot_Theta = J_dot_Theta_func(x,params);   
-    J_z = [J_L;J_Theta];
-    J_z_dot = [J_dot_L;J_dot_Theta];      
-    J_C = J_C_func(x,params);   
+    %J_dot_L = J_dot_L_func(x,params);    
+%     Theta = Theta_func(x,params);
+%     J_Theta = J_Theta_func(x,params);
+%     J_dot_Theta = J_dot_Theta_func(x,params);   
+%     J_z = [J_L;J_Theta];
+%     J_z_dot = [J_dot_L;J_dot_Theta];      
+%     J_C = J_C_func(x,params);   
     
     qdot = x(3:4);
     deltaL = L - L0;
@@ -197,11 +197,11 @@ persistent hip_pos_prev...
     elseif md>10000
         md = 10000;
     end
-    M_z = diag([md,md]);
+    %M_z = diag([md,md]);
     
     %Calculate system energy
-    Espring = 1/2*k*deltaL^2; %virtual spring potential energy
-    KE = 1/2*md*(Ldot^2);     %virtual mass kinetic energy
+    Espring = 1/2*k*(L-L0)^2; %virtual spring potential energy
+    KE = 1/2*md*(Ldot)^2;     %virtual mass kinetic energy
     Esys = Espring + KE;
     
     %Phase Variable 
@@ -267,24 +267,22 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual spring
-        %z_tilde = [Theta-Theta_ref;L-L0];
-        %K = diag([k,k]);
-        %D = diag([d,d]);
-        %M_J_L_inv = pinv((J_L/M));
-        u_s = C*qdot + G + (M/M_z)*(-K*z_tilde - D*z_dot);
-
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
-        U_S_KNEE = u_s(1);
-        U_S_ANKLE = u_s(2);
+        u_lin_spring = -k.*(deltaL).*J_L;     
+        u_lin_damp = -d.*(Ldot).*J_L;
 
-        Knee_torque_command_stance  = Knee_torque_command_stance + u_s(1); 
-        Ankle_torque_command_stance = Ankle_torque_command_stance + u_s(2);
+        U_LIN_DAMP_K = -u_lin_damp(4);
+        U_LIN_DAMP_A = u_lin_damp(5);
+        U_LIN_SPRING_K = -u_lin_spring(4);
+        U_LIN_SPRING_A = u_lin_spring(5);
 
+        Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; 
+        Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;
         if KPBC_ON %Also use energy tracking controller   
-            Omega = diag([1,0]);
             kappa = pbc_gain_knee;
-            u_r  = -kappa*(Esys - Eref)*M_J_L_inv*Omega*Ldot; 
+            u_r  = kappa*(Esys - Eref)*Ldot*J_L; 
 
+            %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
             U_PBC_K = u_r(1); 
             U_PBC_A = u_r(2);
                          
@@ -321,6 +319,8 @@ persistent hip_pos_prev...
                       
         end
         %% Swing
+        Knee_torque_command_swing=0;
+        Ankle_torque_command_swing=0;
         if IMU_LIVE
             %Use hip pos as phase variable to index winters data
             [knee_des_out ,~,ankle_des_out,~]=winterFit(phase_var_out*1000,a_knee,a_ankle,knee_ind,ankle_ind);
