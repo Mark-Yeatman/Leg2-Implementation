@@ -5,7 +5,7 @@
  * File: _coder_SLIP_KPBC_api.c
  *
  * MATLAB Coder version            : 3.2
- * C/C++ source code generated on  : 01-Jul-2020 11:22:48
+ * C/C++ source code generated on  : 31-Aug-2020 12:07:22
  */
 
 /* Include Files */
@@ -137,15 +137,15 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
   real32_T KPBC_ON;
   real32_T KPBC_max_torque_rate;
   real32_T pbc_gain_knee;
-  real32_T M;
+  real32_T md;
   real32_T Eref;
   real32_T knee_stop_low;
   real32_T knee_stop_high;
   real32_T ankle_stop_low;
   real32_T ankle_stop_high;
   real32_T max_torque;
-  real32_T k_tilde;
-  real32_T Ignore_PushOff;
+  real32_T v0;
+  real32_T Fric_Comp;
   real32_T F_thresh;
   real32_T Command_State;
   real32_T KPBC_max_torque;
@@ -156,9 +156,9 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
   real32_T hip_pos;
   real32_T Esys;
   real32_T Esys_integrate_out;
-  real32_T U_LIN_SPRING_K;
-  real32_T U_LIN_SPRING_A;
-  real32_T U_LIN_DAMP_K;
+  real32_T U_S_KNEE;
+  real32_T U_S_ANKLE;
+  real32_T COPFX;
   real32_T U_LIN_DAMP_A;
   real32_T U_STOP_K;
   real32_T U_STOP_A;
@@ -223,7 +223,7 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
   KPBC_max_torque_rate = emlrt_marshallIn(&st, emlrtAliasP(prhs[25]),
     "KPBC_max_torque_rate");
   pbc_gain_knee = emlrt_marshallIn(&st, emlrtAliasP(prhs[26]), "pbc_gain_knee");
-  M = emlrt_marshallIn(&st, emlrtAliasP(prhs[27]), "M");
+  md = emlrt_marshallIn(&st, emlrtAliasP(prhs[27]), "md");
   Eref = emlrt_marshallIn(&st, emlrtAliasP(prhs[28]), "Eref");
   knee_stop_low = emlrt_marshallIn(&st, emlrtAliasP(prhs[29]), "knee_stop_low");
   knee_stop_high = emlrt_marshallIn(&st, emlrtAliasP(prhs[30]), "knee_stop_high");
@@ -231,8 +231,8 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
   ankle_stop_high = emlrt_marshallIn(&st, emlrtAliasP(prhs[32]),
     "ankle_stop_high");
   max_torque = emlrt_marshallIn(&st, emlrtAliasP(prhs[33]), "max_torque");
-  k_tilde = emlrt_marshallIn(&st, emlrtAliasP(prhs[34]), "k_tilde");
-  Ignore_PushOff = emlrt_marshallIn(&st, emlrtAliasP(prhs[35]), "Ignore_PushOff");
+  v0 = emlrt_marshallIn(&st, emlrtAliasP(prhs[34]), "v0");
+  Fric_Comp = emlrt_marshallIn(&st, emlrtAliasP(prhs[35]), "Fric_Comp");
   F_thresh = emlrt_marshallIn(&st, emlrtAliasP(prhs[36]), "F_thresh");
   Command_State = emlrt_marshallIn(&st, emlrtAliasP(prhs[37]), "Command_State");
   KPBC_max_torque = emlrt_marshallIn(&st, emlrtAliasP(prhs[38]),
@@ -245,15 +245,15 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
             Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment, kp_knee,
             kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,
             vel_filter_coeff, KPBC_filter_coeff, SLIP_ON, lt, k, d, L0, KPBC_ON,
-            KPBC_max_torque_rate, pbc_gain_knee, M, Eref, knee_stop_low,
-            knee_stop_high, ankle_stop_low, ankle_stop_high, max_torque, k_tilde,
-            Ignore_PushOff, F_thresh, Command_State, KPBC_max_torque,
-            Joint_Bio_Sat, &Knee_torque_command, &Ankle_torque_command, &deltaL,
-            &hip_pos, &Esys, &Esys_integrate_out, &U_LIN_SPRING_K,
-            &U_LIN_SPRING_A, &U_LIN_DAMP_K, &U_LIN_DAMP_A, &U_STOP_K, &U_STOP_A,
-            &U_PBC_K, &U_PBC_A, &knee_des_out, &ankle_des_out, &foot_contact,
-            &stance, &swing, &phase_var_out, &IMU_LIVE_OUT, &StanceGain,
-            &SwingGain, &knee_joint_vel, &ankle_joint_vel, &hip_vel, &PushOffOut);
+            KPBC_max_torque_rate, pbc_gain_knee, md, Eref, knee_stop_low,
+            knee_stop_high, ankle_stop_low, ankle_stop_high, max_torque, v0,
+            Fric_Comp, F_thresh, Command_State, KPBC_max_torque, Joint_Bio_Sat,
+            &Knee_torque_command, &Ankle_torque_command, &deltaL, &hip_pos,
+            &Esys, &Esys_integrate_out, &U_S_KNEE, &U_S_ANKLE, &COPFX,
+            &U_LIN_DAMP_A, &U_STOP_K, &U_STOP_A, &U_PBC_K, &U_PBC_A,
+            &knee_des_out, &ankle_des_out, &foot_contact, &stance, &swing,
+            &phase_var_out, &IMU_LIVE_OUT, &StanceGain, &SwingGain,
+            &knee_joint_vel, &ankle_joint_vel, &hip_vel, &PushOffOut);
 
   /* Marshall function outputs */
   plhs[0] = emlrt_marshallOut(Knee_torque_command);
@@ -262,9 +262,9 @@ void SLIP_KPBC_api(const mxArray * const prhs[40], const mxArray *plhs[27])
   plhs[3] = emlrt_marshallOut(hip_pos);
   plhs[4] = emlrt_marshallOut(Esys);
   plhs[5] = emlrt_marshallOut(Esys_integrate_out);
-  plhs[6] = emlrt_marshallOut(U_LIN_SPRING_K);
-  plhs[7] = emlrt_marshallOut(U_LIN_SPRING_A);
-  plhs[8] = emlrt_marshallOut(U_LIN_DAMP_K);
+  plhs[6] = emlrt_marshallOut(U_S_KNEE);
+  plhs[7] = emlrt_marshallOut(U_S_ANKLE);
+  plhs[8] = emlrt_marshallOut(COPFX);
   plhs[9] = emlrt_marshallOut(U_LIN_DAMP_A);
   plhs[10] = emlrt_marshallOut(U_STOP_K);
   plhs[11] = emlrt_marshallOut(U_STOP_A);

@@ -7,13 +7,14 @@ function [Knee_torque_command, Ankle_torque_command, deltaL, hip_pos, Esys, Esys
             Load_cell_x_force, Load_cell_y_force, Load_cell_z_force,...
             Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment,...
             kp_knee, kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,...
-            vel_filter_coeff, KPBC_filter_coeff,...
+            vel_exp_smooth_coeff, KPBC_exp_smooth_coeff,...
             SLIP_ON, lt, k, d, L0, ...
-            KPBC_ON, KPBC_max_torque_rate , pbc_gain_knee, md, Eref,...
+            KPBC_ON, KPBC_max_torque_rate , pbc_gain, md, Eref,...
             knee_stop_low, knee_stop_high, ankle_stop_low, ankle_stop_high,...
-            max_torque,...
-            v0, Fric_Comp, F_thresh,...
-            Command_State,...
+            Net_max_torque,...
+            v0, Fric_Comp,...
+            F_thresh,...
+            Phase,...
             KPBC_max_torque, Joint_Bio_Sat)
 
 %Inputs in addition to sensors:
@@ -42,7 +43,8 @@ persistent hip_pos_prev...
            PushOff...
            u_pbc_knee_prev...
            u_pbc_ankle_prev...
-           %t_switched_swing... %implement swing setpoint switching hold?
+           COP_prev
+       %t_switched_swing... %implement swing setpoint switching hold?
        
     if isempty(knee_pos_prev)
         hip_pos_prev = IMU_pitch;
@@ -65,6 +67,7 @@ persistent hip_pos_prev...
         Hip_Pos_Min = -20;
         IMU_LIVE = true;
         PushOff = false;
+        COP_prev = -0.0508;
     end
 
     %% Initialization and Hard Coded Values
@@ -113,9 +116,9 @@ persistent hip_pos_prev...
     
     %Calculate joint velocities usindg exponential smoothing filter
     %https://en.wikipedia.org/wiki/Exponential_smoothing
-    hip_vel = (1-vel_filter_coeff)*hip_vel_prev + vel_filter_coeff*(hip_pos-hip_pos_prev)/dt;
-    knee_vel = (1-vel_filter_coeff)*knee_vel_prev + vel_filter_coeff*(knee_pos-knee_pos_prev)/dt;
-    ankle_vel = (1-vel_filter_coeff)*ankle_vel_prev + vel_filter_coeff*(ankle_pos-ankle_pos_prev)/dt;
+    hip_vel = (1-vel_exp_smooth_coeff)*hip_vel_prev + vel_exp_smooth_coeff*(hip_pos-hip_pos_prev)/dt;
+    knee_vel = (1-vel_exp_smooth_coeff)*knee_vel_prev + vel_exp_smooth_coeff*(knee_pos-knee_pos_prev)/dt;
+    ankle_vel = (1-vel_exp_smooth_coeff)*ankle_vel_prev + vel_exp_smooth_coeff*(ankle_pos-ankle_pos_prev)/dt;
     
     %% Determine foot contact
     if norm([Load_cell_x_force, Load_cell_y_force, Load_cell_z_force],2) > F_thresh
@@ -158,7 +161,9 @@ persistent hip_pos_prev...
     % Mf - foot mass
 
     % COPfx calc
-    n = [0,1,0]';
+    COP_lim_up = single(0.06);  %from pilot walking trials
+    COP_lim_down = single(-0.0508);
+    n = [0,0,1]';
     MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';
     F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';
     WC = [F;MA];   
@@ -168,40 +173,47 @@ persistent hip_pos_prev...
     COPfx = OC(1);        
     if ~FootContact
         %(-2,8) inches
-        COPfx = (0.2032 - 0.0508)/2; %meters
+        COPfx = COP_lim_down;
+        COP_prev = COP_lim_down;
+    else
+        %only allow the COP to progress forwards
+        if COPfx<COP_prev
+            COPfx = COP_prev;
+        else
+            COP_prev = COPfx;
+        end
     end
-    COPfx = Saturate(COPfx,-0.0508,0.2032); %meters
+    COPfx = Saturate(COPfx,COP_lim_down,COP_lim_up); %meters
     COPFX = COPfx;
     
     params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];
    
-    M = M_func(x,params);
-    C = C_func(x,params);
-    G = G_func(x,params);    
+%     M = M_func(x,params);
+%     C = C_func(x,params);
+%     G = G_func(x,params);    
     L = L_func(x,params);
     J_L = J_L_func(x,params);
-    J_dot_L = J_dot_L_func(x,params);    
-    Theta = Theta_func(x,params);
-    J_Theta = J_Theta_func(x,params);
-    J_dot_Theta = J_dot_Theta_func(x,params);   
-    J_z = [J_L;J_Theta];
-    J_z_dot = [J_dot_L;J_dot_Theta];      
-    J_C = J_C_func(x,params);   
+    %J_dot_L = J_dot_L_func(x,params);    
+%     Theta = Theta_func(x,params);
+%     J_Theta = J_Theta_func(x,params);
+%     J_dot_Theta = J_dot_Theta_func(x,params);   
+%     J_z = [J_L;J_Theta];
+%     J_z_dot = [J_dot_L;J_dot_Theta];      
+%     J_C = J_C_func(x,params);   
     
     qdot = x(3:4);
     deltaL = L - L0;
-    z_dot = J_z*qdot;
-    Ldot = z_dot(1);
+    Ldot = J_L*qdot;
     if md<10
        md = 10;
     elseif md>10000
         md = 10000;
     end
-    M_z = diag([md,md]);
+    %M_z = diag([md,md]);
     
     %Calculate system energy
-    Espring = 1/2*k*deltaL^2; %virtual spring potential energy
-    KE = 1/2*md*(Ldot^2);     %virtual mass kinetic energy
+    Espring = 1/2*k*(L-L0)^2; %virtual spring potential energy
+    KE = 1/2*md*(Ldot)^2;     %virtual mass kinetic energy
     Esys = Espring + KE;
     
     %Phase Variable 
@@ -213,7 +225,7 @@ persistent hip_pos_prev...
     IMU_LIVE = abs(hip_pos_prev-hip_pos)<1;
     
     %% Phase State management, set autodetection or command stance/swing
-    if int8(Command_State) == int8(0)
+    if int8(Phase) == int8(0)
         %Determine stance vs swing, only allow phase state switching every t_hold seconds
         if Stance && ~FootContact %The state needs to be switched
             if t_hold < (time_in - t_switched_phase) %Check the last time we switched, if its too fast, wait
@@ -245,14 +257,14 @@ persistent hip_pos_prev...
             SwingGain = min(t_norm,1);
             StanceGain = 1-SwingGain; 
         end
-    elseif int8(Command_State) == int8(1) %Stance
+    elseif int8(Phase) == int8(1) %Stance
         Stance = true;
         Swing = false;
         Hip_Pos_Max = 23;
         Hip_Pos_Min = - 20;
         StanceGain = 1;
         SwingGain = 0;
-    elseif int8(Command_State) == int8(2) %Swing
+    elseif int8(Phase) == int8(2) %Swing
         Stance = false;
         Swing = true;
         Hip_Pos_Max = 23;
@@ -267,24 +279,22 @@ persistent hip_pos_prev...
         Ankle_torque_command_stance = 0;
         %% Stance                
         %Virtual spring
-        %z_tilde = [Theta-Theta_ref;L-L0];
-        %K = diag([k,k]);
-        %D = diag([d,d]);
-        %M_J_L_inv = pinv((J_L/M));
-        u_s = C*qdot + G + (M/M_z)*(-K*z_tilde - D*z_dot));
-
         %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
-        U_S_KNEE = u_s(1);
-        U_S_ANKLE = u_s(2);
+        u_lin_spring = -k.*(deltaL).*J_L';     
+        u_lin_damp = -d.*(Ldot).*J_L';
 
-        Knee_torque_command_stance  = Knee_torque_command_stance + u_s(1); 
-        Ankle_torque_command_stance = Ankle_torque_command_stance + u_s(2);
+        U_LIN_DAMP_K = u_lin_damp(1);
+        U_LIN_DAMP_A = u_lin_damp(2);
+        U_LIN_SPRING_K = u_lin_spring(1);
+        U_LIN_SPRING_A = u_lin_spring(2);
 
+        Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; 
+        Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;
         if KPBC_ON %Also use energy tracking controller   
-            Omega = diag([1,0]);
-            kappa = pbc_gain_knee;
-            u_r  = -kappa*(Esys - Eref)*M_J_L_inv*Omega*Ldot; 
+            kappa = pbc_gain;
+            u_r  = kappa*(Esys - Eref)*Ldot*J_L; 
 
+            %MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION
             U_PBC_K = u_r(1); 
             U_PBC_A = u_r(2);
                          
@@ -304,8 +314,8 @@ persistent hip_pos_prev...
                 U_PBC_A = da*dt+u_pbc_ankle_prev;
             end           
             %Exponential smoothing of torque
-            U_PBC_K = (1-KPBC_filter_coeff)*u_pbc_knee_prev + KPBC_filter_coeff*U_PBC_K;
-            U_PBC_A = (1-KPBC_filter_coeff)*u_pbc_ankle_prev + KPBC_filter_coeff*U_PBC_A;
+            U_PBC_K = (1-KPBC_exp_smooth_coeff)*u_pbc_knee_prev + KPBC_exp_smooth_coeff*U_PBC_K;
+            U_PBC_A = (1-KPBC_exp_smooth_coeff)*u_pbc_ankle_prev + KPBC_exp_smooth_coeff*U_PBC_A;
             
             %Biomemetic power saturation
             if Joint_Bio_Sat               
@@ -318,9 +328,12 @@ persistent hip_pos_prev...
                     U_PBC_K = 0;
                 end
             end
-                      
+            Knee_torque_command_stance = Knee_torque_command_stance + U_PBC_K - U_LIN_DAMP_K;
+            Ankle_torque_command_stance = Ankle_torque_command_stance + U_PBC_A - U_LIN_DAMP_A;          
         end
         %% Swing
+        Knee_torque_command_swing=0;
+        Ankle_torque_command_swing=0;
         if IMU_LIVE
             %Use hip pos as phase variable to index winters data
             [knee_des_out ,~,ankle_des_out,~]=winterFit(phase_var_out*1000,a_knee,a_ankle,knee_ind,ankle_ind);
@@ -388,9 +401,9 @@ persistent hip_pos_prev...
     Ankle_torque_command = Ankle_torque_command + u_stop(2);
     
     %% Saturate torque output
-    if max_torque>0
-        Knee_torque_command = Saturate(Knee_torque_command,-max_torque,max_torque);
-        Ankle_torque_command = Saturate(Ankle_torque_command,-max_torque,max_torque);
+    if Net_max_torque>0
+        Knee_torque_command = Saturate(Knee_torque_command,-Net_max_torque,Net_max_torque);
+        Ankle_torque_command = Saturate(Ankle_torque_command,-Net_max_torque,Net_max_torque);
     end
         
     %% Persistent/output variable management

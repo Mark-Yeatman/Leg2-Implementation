@@ -1,5 +1,5 @@
 <deployment-project plugin="plugin.coder" plugin-version="R2016a">
-  <configuration build-checksum="1576321807" file="\\engstor\locolab\Member Folders\Mark Yeatman\Codes\Matlab\Leg2_Implementation\SLIP_KPBC.prj" location="\\engstor\locolab\Member Folders\Mark Yeatman\Codes\Matlab\Leg2_Implementation" name="SLIP_KPBC" target="target.unifiedcoder" target-name="MATLAB Coder">
+  <configuration build-checksum="813706591" file="C:\Users\mxy110230\Git Repos\Leg2-Implementation\SLIP_KPBC.prj" location="C:\Users\mxy110230\Git Repos\Leg2-Implementation" name="SLIP_KPBC" target="target.unifiedcoder" target-name="MATLAB Coder">
     <profile key="profile.mex">
       <param.BuiltInstrumentedMex />
       <param.RanInstrumentedMex>false</param.RanInstrumentedMex>
@@ -741,7 +741,7 @@
     <param.AutoInferUnboundedSizeThreshold>2048</param.AutoInferUnboundedSizeThreshold>
     <param.EnableFixedPointStep>false</param.EnableFixedPointStep>
     <param.EnableScreener>true</param.EnableScreener>
-    <param.AnnotationChecksum>1471467538</param.AnnotationChecksum>
+    <param.AnnotationChecksum>663965592</param.AnnotationChecksum>
     <var.LegacyTarget />
     <var.MirrorOnOpen>false</var.MirrorOnOpen>
     <param.FixedPointEnabled>false</param.FixedPointEnabled>
@@ -750,13 +750,13 @@
     <param.unifiedParamStorage />
     <var.gc.lastOutputRoot>codegen\lib\SLIP_KPBC</var.gc.lastOutputRoot>
     <var.gc.lastOutputType>C_CODE</var.gc.lastOutputType>
-    <var.gc.preBuildChecksum>1670606305</var.gc.preBuildChecksum>
+    <var.gc.preBuildChecksum>813706591</var.gc.preBuildChecksum>
     <var.cfi.lastOutputRoot>codegen\mex\SLIP_KPBC</var.cfi.lastOutputRoot>
-    <var.cfi.preBuildChecksum>1666682234</var.cfi.preBuildChecksum>
+    <var.cfi.preBuildChecksum>3310121972</var.cfi.preBuildChecksum>
     <var.lastCfiTestSnippet>SLIP_KPBC_testbench</var.lastCfiTestSnippet>
     <var.outdatedOnRestore>false</var.outdatedOnRestore>
-    <var.lastUserSourceChecksum>&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;&lt;checksum&gt;&lt;includedFiles&gt;&lt;file&gt;\\engstor\locolab\Member Folders\Mark Yeatman\Codes\Matlab\Leg2_Implementation\SLIP_KPBC.m&lt;/file&gt;&lt;/includedFiles&gt;&lt;value&gt;4272789355&lt;/value&gt;&lt;/checksum&gt;</var.lastUserSourceChecksum>
-    <var.sourceSetState>&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;&lt;sourceModel&gt;&lt;primarySourceFiles&gt;&lt;file&gt;\\engstor\locolab\Member Folders\Mark Yeatman\Codes\Matlab\Leg2_Implementation\SLIP_KPBC.m&lt;/file&gt;&lt;/primarySourceFiles&gt;&lt;fixedPointSourceFiles/&gt;&lt;fixedPointSourceRegistered&gt;false&lt;/fixedPointSourceRegistered&gt;&lt;fixedPointSourceSelected&gt;false&lt;/fixedPointSourceSelected&gt;&lt;/sourceModel&gt;</var.sourceSetState>
+    <var.lastUserSourceChecksum>&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;&lt;checksum&gt;&lt;includedFiles&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\SLIP_KPBC.m&lt;/file&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\ToMatlabOutputs\J_L_func.m&lt;/file&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\ToMatlabOutputs\L_func.m&lt;/file&gt;&lt;/includedFiles&gt;&lt;value&gt;926640256&lt;/value&gt;&lt;/checksum&gt;</var.lastUserSourceChecksum>
+    <var.sourceSetState>&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;&lt;sourceModel&gt;&lt;primarySourceFiles&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\SLIP_KPBC.m&lt;/file&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\ToMatlabOutputs\J_L_func.m&lt;/file&gt;&lt;file&gt;C:\Users\mxy110230\Git Repos\Leg2-Implementation\ToMatlabOutputs\L_func.m&lt;/file&gt;&lt;/primarySourceFiles&gt;&lt;fixedPointSourceFiles/&gt;&lt;fixedPointSourceRegistered&gt;false&lt;/fixedPointSourceRegistered&gt;&lt;fixedPointSourceSelected&gt;false&lt;/fixedPointSourceSelected&gt;&lt;/sourceModel&gt;</var.sourceSetState>
     <param.forceMexBuild>false</param.forceMexBuild>
     <param.configImportActive>false</param.configImportActive>
     <var.boundToGui>true</var.boundToGui>
@@ -883,7 +883,7 @@
     </unset>
     <fileset.entrypoints>
       <file custom-data-expanded="false" value="${PROJECT_ROOT}\SLIP_KPBC.m">
-        <Marker>1593620512364</Marker>
+        <Marker>1598382211548</Marker>
       </file>
     </fileset.entrypoints>
     <fileset.testbench>
@@ -919,15 +919,15 @@
           <Input Name="KPBC_ON" typeId="0" />
           <Input Name="KPBC_max_torque_rate" typeId="0" />
           <Input Name="pbc_gain_knee" typeId="0" />
-          <Input Name="M" typeId="0" />
+          <Input Name="md" typeId="0" />
           <Input Name="Eref" typeId="0" />
           <Input Name="knee_stop_low" typeId="0" />
           <Input Name="knee_stop_high" typeId="0" />
           <Input Name="ankle_stop_low" typeId="0" />
           <Input Name="ankle_stop_high" typeId="0" />
           <Input Name="max_torque" typeId="0" />
-          <Input Name="k_tilde" typeId="0" />
-          <Input Name="Ignore_PushOff" typeId="0" />
+          <Input Name="v0" typeId="0" />
+          <Input Name="Fric_Comp" typeId="0" />
           <Input Name="F_thresh" typeId="0" />
           <Input Name="Command_State" typeId="0" />
           <Input Name="KPBC_max_torque" typeId="0" />
@@ -946,7 +946,7 @@
       </file>
     </fileset.inputtypes>
     <build-deliverables>
-      <file location="${PROJECT_ROOT}\codegen\lib\SLIP_KPBC" name="SLIP_KPBC.lib" optional="false">\\engstor\locolab\Member Folders\Mark Yeatman\Codes\Matlab\Leg2_Implementation\codegen\lib\SLIP_KPBC\SLIP_KPBC.lib</file>
+      <file location="${PROJECT_ROOT}\codegen\lib\SLIP_KPBC" name="SLIP_KPBC.lib" optional="false">C:\Users\mxy110230\Git Repos\Leg2-Implementation\codegen\lib\SLIP_KPBC\SLIP_KPBC.lib</file>
     </build-deliverables>
     <workflow />
     <matlab>

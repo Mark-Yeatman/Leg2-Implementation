@@ -1,0 +1,499 @@
+<!-- saved from url=(0014)about:internet -->
+<div class="dead">
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,1" id="srcline1">  1</a></span><span class="line">function [Knee_torque_command, Ankle_torque_command, deltaL, hip_pos, Esys, Esys_integrate_out,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,2" id="srcline2">  2</a></span><span class="line">        U_S_KNEE, U_S_ANKLE, COPFX, U_LIN_DAMP_A, U_STOP_K, U_STOP_A, U_PBC_K,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,3" id="srcline3">  3</a></span><span class="line">        U_PBC_A, knee_des_out,ankle_des_out, foot_contact, stance, swing,phase_var_out,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,4" id="srcline4">  4</a></span><span class="line">        IMU_LIVE_OUT,StanceGain,SwingGain,knee_joint_vel,ankle_joint_vel,hip_vel,PushOffOut]...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,5" id="srcline5">  5</a></span><span class="line">= SLIP_KPBC(IMU_pitch, Knee_joint_position, Ankle_joint_position, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,6" id="srcline6">  6</a></span><span class="line">            time_in, dt, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,7" id="srcline7">  7</a></span><span class="line">            Load_cell_x_force, Load_cell_y_force, Load_cell_z_force,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,8" id="srcline8">  8</a></span><span class="line">            Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,9" id="srcline9">  9</a></span><span class="line">            kp_knee, kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,10" id="srcline10"> 10</a></span><span class="line">            vel_filter_coeff, KPBC_filter_coeff,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,11" id="srcline11"> 11</a></span><span class="line">            SLIP_ON, lt, k, d, L0, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,12" id="srcline12"> 12</a></span><span class="line">            KPBC_ON, KPBC_max_torque_rate , pbc_gain_knee, md, Eref,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,13" id="srcline13"> 13</a></span><span class="line">            knee_stop_low, knee_stop_high, ankle_stop_low, ankle_stop_high,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,14" id="srcline14"> 14</a></span><span class="line">            max_torque,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,15" id="srcline15"> 15</a></span><span class="line">            v0, Fric_Comp, F_thresh,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,16" id="srcline16"> 16</a></span><span class="line">            Command_State,...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,17" id="srcline17"> 17</a></span><span class="line">            KPBC_max_torque, Joint_Bio_Sat)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,18" id="srcline18"> 18</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,19" id="srcline19"> 19</a></span><span class="line"><span class="comment">%Inputs in addition to sensors:</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,20" id="srcline20"> 20</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,21" id="srcline21"> 21</a></span><span class="line"><span class="comment">% Knee_joint_position, Ankle_joint_position are in degrees, in a</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,22" id="srcline22"> 22</a></span><span class="line"><span class="comment">% "biomechanics frame"</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,23" id="srcline23"> 23</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,24" id="srcline24"> 24</a></span><span class="line"><span class="comment">% t, dt, t_out are in seconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,25" id="srcline25"> 25</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,26" id="srcline26"> 26</a></span><span class="line">    <span class="comment">%% Persistent Variable Definitions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,27" id="srcline27"> 27</a></span><span class="line"><span class="comment">%Persistent variables used to store data between iterations</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,28" id="srcline28"> 28</a></span><span class="line">persistent hip_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,29" id="srcline29"> 29</a></span><span class="line">           knee_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,30" id="srcline30"> 30</a></span><span class="line">           ankle_pos_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,31" id="srcline31"> 31</a></span><span class="line">           knee_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,32" id="srcline32"> 32</a></span><span class="line">           ankle_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,33" id="srcline33"> 33</a></span><span class="line">           hip_vel_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,34" id="srcline34"> 34</a></span><span class="line">           Esys_integrate...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,35" id="srcline35"> 35</a></span><span class="line">           t_switched_phase...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,36" id="srcline36"> 36</a></span><span class="line">           Stance...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,37" id="srcline37"> 37</a></span><span class="line">           Swing...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,38" id="srcline38"> 38</a></span><span class="line">           ForceCount...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,39" id="srcline39"> 39</a></span><span class="line">           Hip_Pos_Max...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,40" id="srcline40"> 40</a></span><span class="line">           Hip_Pos_Min...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,41" id="srcline41"> 41</a></span><span class="line">           IMU_LIVE...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,42" id="srcline42"> 42</a></span><span class="line">           PushOff...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,43" id="srcline43"> 43</a></span><span class="line">           u_pbc_knee_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,44" id="srcline44"> 44</a></span><span class="line">           u_pbc_ankle_prev...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,45" id="srcline45"> 45</a></span><span class="line">           COP_prev</span></span>
+<span class="srcline"><span class="lineno"><a href="1,46" id="srcline46"> 46</a></span><span class="line">       <span class="comment">%t_switched_swing...<span class="comment"> %implement swing setpoint switching hold?</span></span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,47" id="srcline47"> 47</a></span><span class="line">       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,48" id="srcline48"> 48</a></span><span class="line">    if isempty(knee_pos_prev)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,49" id="srcline49"> 49</a></span><span class="line">        hip_pos_prev = IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,50" id="srcline50"> 50</a></span><span class="line">        knee_pos_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,51" id="srcline51"> 51</a></span><span class="line">        ankle_pos_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,52" id="srcline52"> 52</a></span><span class="line">        knee_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,53" id="srcline53"> 53</a></span><span class="line">        ankle_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,54" id="srcline54"> 54</a></span><span class="line">        hip_vel_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,55" id="srcline55"> 55</a></span><span class="line">        IMU_pitch_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,56" id="srcline56"> 56</a></span><span class="line">        Esys_integrate  = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,57" id="srcline57"> 57</a></span><span class="line">        u_pbc_knee_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,58" id="srcline58"> 58</a></span><span class="line">        u_pbc_ankle_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,59" id="srcline59"> 59</a></span><span class="line">        t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,60" id="srcline60"> 60</a></span><span class="line">        <span class="comment">%t_switched_swing = time_in;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,61" id="srcline61"> 61</a></span><span class="line">        Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,62" id="srcline62"> 62</a></span><span class="line">        Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,63" id="srcline63"> 63</a></span><span class="line">        ForceCount = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,64" id="srcline64"> 64</a></span><span class="line">        Edis = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,65" id="srcline65"> 65</a></span><span class="line">        Hip_Pos_Max  = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,66" id="srcline66"> 66</a></span><span class="line">        Hip_Pos_Min = -20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,67" id="srcline67"> 67</a></span><span class="line">        IMU_LIVE = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,68" id="srcline68"> 68</a></span><span class="line">        PushOff = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,69" id="srcline69"> 69</a></span><span class="line">        COP_prev = -0.0508;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,70" id="srcline70"> 70</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,71" id="srcline71"> 71</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,72" id="srcline72"> 72</a></span><span class="line">    <span class="comment">%% Initialization and Hard Coded Values</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,73" id="srcline73"> 73</a></span><span class="line">    <span class="comment">%params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,74" id="srcline74"> 74</a></span><span class="line">    Ms = single(6.991429/2.205); <span class="comment">% converted lb to kg</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,75" id="srcline75"> 75</a></span><span class="line">    Mf = single(1.643130/2.205); <span class="comment">% converted lb to kg</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,76" id="srcline76"> 76</a></span><span class="line">    Isz = single(0.02592934); <span class="comment">%kg*m^2</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,77" id="srcline77"> 77</a></span><span class="line">    Ifz = single(0.0024078341); <span class="comment">%kg*m^2</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,78" id="srcline78"> 78</a></span><span class="line">    <span class="comment">%lt = single(0.3733); %meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,79" id="srcline79"> 79</a></span><span class="line">    ls = single(0.3733); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,80" id="srcline80"> 80</a></span><span class="line">    rs = single(0.1705526434); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,81" id="srcline81"> 81</a></span><span class="line">    la = single(0.0628); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,82" id="srcline82"> 82</a></span><span class="line">    rfx = single(0.027510613); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,83" id="srcline83"> 83</a></span><span class="line">    rfy = single(0.0335); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,84" id="srcline84"> 84</a></span><span class="line">    lc = single(2.00914e-5); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,85" id="srcline85"> 85</a></span><span class="line">    g = 9.81; <span class="comment">%meters/s^2;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,86" id="srcline86"> 86</a></span><span class="line">      </span></span>
+<span class="srcline"><span class="lineno"><a href="1,87" id="srcline87"> 87</a></span><span class="line">    COPFX = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,88" id="srcline88"> 88</a></span><span class="line">    U_LIN_DAMP_A = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,89" id="srcline89"> 89</a></span><span class="line">    U_S_KNEE = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,90" id="srcline90"> 90</a></span><span class="line">    U_S_ANKLE = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,91" id="srcline91"> 91</a></span><span class="line">    U_PBC_K = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,92" id="srcline92"> 92</a></span><span class="line">    U_PBC_A = single(0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,93" id="srcline93"> 93</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,94" id="srcline94"> 94</a></span><span class="line">    <span class="comment">% Position/velocity hard limits</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,95" id="srcline95"> 95</a></span><span class="line">    ANKLE_POS_MIN_LIM  = -35;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,96" id="srcline96"> 96</a></span><span class="line">    ANKLE_POS_MAX_LIM = 35;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,97" id="srcline97"> 97</a></span><span class="line">    ANKLE_VEL_MIN_LIM = -200; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,98" id="srcline98"> 98</a></span><span class="line">    ANKLE_VEL_MAX_LIM = 200; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,99" id="srcline99"> 99</a></span><span class="line">    KNEE_POS_MIN_LIM = 2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,100" id="srcline100">100</a></span><span class="line">    KNEE_POS_MAX_LIM = 105;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,101" id="srcline101">101</a></span><span class="line">    KNEE_VEL_MIN_LIM = -400; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,102" id="srcline102">102</a></span><span class="line">    KNEE_VEL_MAX_LIM = 400; <span class="comment">%deg/s</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,103" id="srcline103">103</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,104" id="srcline104">104</a></span><span class="line">    <span class="comment">%Winters Data Arrays</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,105" id="srcline105">105</a></span><span class="line">    a_knee=[-21.9472500000000,4.24525000000000,21.6720000000000,0;20.9295000000000,-6.97650000000000,7.71900000000000,0;15.9362500000000,-0.998250000000000,18.6640000000000,25.8830000000000;-59.8412500000000,13.6422500000000,64.8630000000000,0;-19.4405000000000,-1.40250000000000,38.4100000000000,-47.2960000000000;45.1070000000000,-7.15300000000000,0.456000000000000,0;1.42525000000000,0.0657500000000000,2.21000000000000,3.24500000000000];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,106" id="srcline106">106</a></span><span class="line">    a_ankle=[5.50050000000000,-0.880500000000000,-4.60000000000000,0;-8.98500000000000,3.77020000000000,5.26600000000000,4.65120000000000;0.812500000000000,-0.475000000000000,7.74100000000000,2.81250000000000;-2.19975000000000,0.320750000000000,9.62000000000000,0;-14.7575000000000,0.878500000000001,-0.745000000000000,-24.2440000000000;23.0932000000000,-3.91420000000000,-19.9240000000000,0;-29.8020000000000,9.93400000000000,-0.0560000000000000,0;0.703500000000000,-0.234500000000000,-0.525000000000000,0;-2.60850000000000,0.869500000000000,1.21400000000000,0;-0.729000000000000,0.0190000000000000,0.580000000000000,-1.34400000000000];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,107" id="srcline107">107</a></span><span class="line">    knee_ind=[1 139 400 530 720 848 976 1001];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,108" id="srcline108">108</a></span><span class="line">    ankle_ind=[1 61 205 330 440 550 653 846 898 977 1001];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,109" id="srcline109">109</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,110" id="srcline110">110</a></span><span class="line">    <span class="comment">%% State Calculations</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,111" id="srcline111">111</a></span><span class="line">    <span class="comment">%Assign joint positions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,112" id="srcline112">112</a></span><span class="line">    hip_pos = IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,113" id="srcline113">113</a></span><span class="line">    knee_pos =  Knee_joint_position; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,114" id="srcline114">114</a></span><span class="line">    ankle_pos = Ankle_joint_position;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,115" id="srcline115">115</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,116" id="srcline116">116</a></span><span class="line">    <span class="comment">%Calculate joint velocities usindg exponential smoothing filter</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,117" id="srcline117">117</a></span><span class="line">    <span class="comment">%https://en.wikipedia.org/wiki/Exponential_smoothing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,118" id="srcline118">118</a></span><span class="line">    hip_vel = (1-vel_filter_coeff)*hip_vel_prev + vel_filter_coeff*(hip_pos-hip_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,119" id="srcline119">119</a></span><span class="line">    knee_vel = (1-vel_filter_coeff)*knee_vel_prev + vel_filter_coeff*(knee_pos-knee_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,120" id="srcline120">120</a></span><span class="line">    ankle_vel = (1-vel_filter_coeff)*ankle_vel_prev + vel_filter_coeff*(ankle_pos-ankle_pos_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,121" id="srcline121">121</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,122" id="srcline122">122</a></span><span class="line">    <span class="comment">%% Determine foot contact</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,123" id="srcline123">123</a></span><span class="line">    if norm([Load_cell_x_force, Load_cell_y_force, Load_cell_z_force],2) &gt; F_thresh</span></span>
+<span class="srcline"><span class="lineno"><a href="1,124" id="srcline124">124</a></span><span class="line">        ForceCount = ForceCount+1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,125" id="srcline125">125</a></span><span class="line">        if ForceCount &gt; 2</span></span>
+<span class="srcline"><span class="lineno"><a href="1,126" id="srcline126">126</a></span><span class="line">            FootContact = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,127" id="srcline127">127</a></span><span class="line">        else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,128" id="srcline128">128</a></span><span class="line">            FootContact = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,129" id="srcline129">129</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,130" id="srcline130">130</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,131" id="srcline131">131</a></span><span class="line">        FootContact = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,132" id="srcline132">132</a></span><span class="line">        ForceCount = 0;   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,133" id="srcline133">133</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,134" id="srcline134">134</a></span><span class="line">             </span></span>
+<span class="srcline"><span class="lineno"><a href="1,135" id="srcline135">135</a></span><span class="line">    StanceGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,136" id="srcline136">136</a></span><span class="line">    SwingGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,137" id="srcline137">137</a></span><span class="line">    t_hold = 0.3;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,138" id="srcline138">138</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,139" id="srcline139">139</a></span><span class="line">    <span class="comment">%Human Leg as a Robot states</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,140" id="srcline140">140</a></span><span class="line">    x = zeros(4,1); </span></span>
+<span class="srcline"><span class="lineno"><a href="1,141" id="srcline141">141</a></span><span class="line">    x(1) =  knee_pos; <span class="comment">%MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,142" id="srcline142">142</a></span><span class="line">    x(2) =  ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,143" id="srcline143">143</a></span><span class="line">    x(3) =  knee_vel; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,144" id="srcline144">144</a></span><span class="line">    x(4) =  ankle_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,145" id="srcline145">145</a></span><span class="line">       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,146" id="srcline146">146</a></span><span class="line">    <span class="comment">%Notes:</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,147" id="srcline147">147</a></span><span class="line">    <span class="comment">% Knee axis treated as origin.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,148" id="srcline148">148</a></span><span class="line">    <span class="comment">% Orientation of knee and ankle rotation is biomechanical</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,149" id="srcline149">149</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,150" id="srcline150">150</a></span><span class="line">    <span class="comment">%variables:</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,151" id="srcline151">151</a></span><span class="line">    <span class="comment">% x - 4x1 array [knee pos, ankle pos, knee vel, ankle vel]</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,152" id="srcline152">152</a></span><span class="line">    <span class="comment">% lt -thigh length </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,153" id="srcline153">153</a></span><span class="line">    <span class="comment">% ls -shank length</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,154" id="srcline154">154</a></span><span class="line">    <span class="comment">% lfx, lfy - foot CoM x,y</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,155" id="srcline155">155</a></span><span class="line">    <span class="comment">% lc - load cell y dist from ankle axis</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,156" id="srcline156">156</a></span><span class="line">    <span class="comment">% la - ankle axis y dist to bottom of foot</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,157" id="srcline157">157</a></span><span class="line">    <span class="comment">% COPfx - COP distance along foot from ankle axis projection, to be</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,158" id="srcline158">158</a></span><span class="line">    <span class="comment">%   computed from load cell</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,159" id="srcline159">159</a></span><span class="line">    <span class="comment">% Ms - shank mass</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,160" id="srcline160">160</a></span><span class="line">    <span class="comment">% Mf - foot mass</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,161" id="srcline161">161</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,162" id="srcline162">162</a></span><span class="line">    <span class="comment">% COPfx calc</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,163" id="srcline163">163</a></span><span class="line">    COP_lim_up = single(0.06);  <span class="comment">%from pilot walking trials</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,164" id="srcline164">164</a></span><span class="line">    COP_lim_down = single(-0.0508);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,165" id="srcline165">165</a></span><span class="line">    n = [0,0,1]';</span></span>
+<span class="srcline"><span class="lineno"><a href="1,166" id="srcline166">166</a></span><span class="line">    MA = [Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment]';</span></span>
+<span class="srcline"><span class="lineno"><a href="1,167" id="srcline167">167</a></span><span class="line">    F = [Load_cell_x_force, Load_cell_y_force, Load_cell_z_force]';</span></span>
+<span class="srcline"><span class="lineno"><a href="1,168" id="srcline168">168</a></span><span class="line">    WC = [F;MA];   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,169" id="srcline169">169</a></span><span class="line">    OA = la*n;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,170" id="srcline170">170</a></span><span class="line">    M0 = (cross(-OA,F)+MA);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,171" id="srcline171">171</a></span><span class="line">    OC = cross(n,M0)/dot(F,n);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,172" id="srcline172">172</a></span><span class="line">    COPfx = OC(1);        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,173" id="srcline173">173</a></span><span class="line">    if ~FootContact</span></span>
+<span class="srcline"><span class="lineno"><a href="1,174" id="srcline174">174</a></span><span class="line">        <span class="comment">%(-2,8) inches</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,175" id="srcline175">175</a></span><span class="line">        COPfx = COP_lim_down;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,176" id="srcline176">176</a></span><span class="line">        COP_prev = COP_lim_down;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,177" id="srcline177">177</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,178" id="srcline178">178</a></span><span class="line">        <span class="comment">%only allow the COP to progress forwards</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,179" id="srcline179">179</a></span><span class="line">        if COPfx&lt;COP_prev</span></span>
+<span class="srcline"><span class="lineno"><a href="1,180" id="srcline180">180</a></span><span class="line">            COPfx = COP_prev;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,181" id="srcline181">181</a></span><span class="line">        else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,182" id="srcline182">182</a></span><span class="line">            COP_prev = COPfx;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,183" id="srcline183">183</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,184" id="srcline184">184</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,185" id="srcline185">185</a></span><span class="line">    COPfx = Saturate(COPfx,COP_lim_down,COP_lim_up); <span class="comment">%meters</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,186" id="srcline186">186</a></span><span class="line">    COPFX = COPfx;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,187" id="srcline187">187</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,188" id="srcline188">188</a></span><span class="line">    params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,189" id="srcline189">189</a></span><span class="line">   </span></span>
+<span class="srcline"><span class="lineno"><a href="1,190" id="srcline190">190</a></span><span class="line"><span class="comment">%     M = M_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,191" id="srcline191">191</a></span><span class="line"><span class="comment">%     C = C_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,192" id="srcline192">192</a></span><span class="line"><span class="comment">%     G = G_func(x,params);    </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,193" id="srcline193">193</a></span><span class="line">    L = L_func(x,params);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,194" id="srcline194">194</a></span><span class="line">    J_L = J_L_func(x,params);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,195" id="srcline195">195</a></span><span class="line">    <span class="comment">%J_dot_L = J_dot_L_func(x,params);    </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,196" id="srcline196">196</a></span><span class="line"><span class="comment">%     Theta = Theta_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,197" id="srcline197">197</a></span><span class="line"><span class="comment">%     J_Theta = J_Theta_func(x,params);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,198" id="srcline198">198</a></span><span class="line"><span class="comment">%     J_dot_Theta = J_dot_Theta_func(x,params);   </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,199" id="srcline199">199</a></span><span class="line"><span class="comment">%     J_z = [J_L;J_Theta];</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,200" id="srcline200">200</a></span><span class="line"><span class="comment">%     J_z_dot = [J_dot_L;J_dot_Theta];      </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,201" id="srcline201">201</a></span><span class="line"><span class="comment">%     J_C = J_C_func(x,params);   </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,202" id="srcline202">202</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,203" id="srcline203">203</a></span><span class="line">    qdot = x(3:4);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,204" id="srcline204">204</a></span><span class="line">    deltaL = L - L0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,205" id="srcline205">205</a></span><span class="line">    Ldot = J_L*qdot;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,206" id="srcline206">206</a></span><span class="line">    if md&lt;10</span></span>
+<span class="srcline"><span class="lineno"><a href="1,207" id="srcline207">207</a></span><span class="line">       md = 10;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,208" id="srcline208">208</a></span><span class="line">    elseif md&gt;10000</span></span>
+<span class="srcline"><span class="lineno"><a href="1,209" id="srcline209">209</a></span><span class="line">        md = 10000;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,210" id="srcline210">210</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,211" id="srcline211">211</a></span><span class="line">    <span class="comment">%M_z = diag([md,md]);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,212" id="srcline212">212</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,213" id="srcline213">213</a></span><span class="line">    <span class="comment">%Calculate system energy</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,214" id="srcline214">214</a></span><span class="line">    Espring = 1/2*k*(L-L0)^2; <span class="comment">%virtual spring potential energy</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,215" id="srcline215">215</a></span><span class="line">    KE = 1/2*md*(Ldot)^2;     <span class="comment">%virtual mass kinetic energy</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,216" id="srcline216">216</a></span><span class="line">    Esys = Espring + KE;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,217" id="srcline217">217</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,218" id="srcline218">218</a></span><span class="line">    <span class="comment">%Phase Variable </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,219" id="srcline219">219</a></span><span class="line">    <span class="comment">%s_a=clamp(1+(1-s_m)/(q_h_0-q_h_m)*(hip-q_h_0),0,1);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,220" id="srcline220">220</a></span><span class="line">    phase_var_out =  0.6 + 0.4*(hip_pos-Hip_Pos_Min)/(Hip_Pos_Max-Hip_Pos_Min);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,221" id="srcline221">221</a></span><span class="line">    phase_var_out = clamp(phase_var_out,0.6,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,222" id="srcline222">222</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,223" id="srcline223">223</a></span><span class="line">    <span class="comment">%IMU State check</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,224" id="srcline224">224</a></span><span class="line">    IMU_LIVE = abs(hip_pos_prev-hip_pos)&lt;1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,225" id="srcline225">225</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,226" id="srcline226">226</a></span><span class="line">    <span class="comment">%% Phase State management, set autodetection or command stance/swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,227" id="srcline227">227</a></span><span class="line">    if int8(Command_State) == int8(0)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,228" id="srcline228">228</a></span><span class="line">        <span class="comment">%Determine stance vs swing, only allow phase state switching every t_hold seconds</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,229" id="srcline229">229</a></span><span class="line">        if Stance &amp;&amp; ~FootContact <span class="comment">%The state needs to be switched</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,230" id="srcline230">230</a></span><span class="line">            if t_hold &lt; (time_in - t_switched_phase) <span class="comment">%Check the last time we switched, if its too fast, wait</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,231" id="srcline231">231</a></span><span class="line">               <span class="comment">%Switch to SWING</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,232" id="srcline232">232</a></span><span class="line">               t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,233" id="srcline233">233</a></span><span class="line">               Swing = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,234" id="srcline234">234</a></span><span class="line">               Stance = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,235" id="srcline235">235</a></span><span class="line">               <span class="comment">%reset the energy intergration variables</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,236" id="srcline236">236</a></span><span class="line">               <span class="comment">%Esys_integrate = 0;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,237" id="srcline237">237</a></span><span class="line">               <span class="comment">%Edis = 0; </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,238" id="srcline238">238</a></span><span class="line">               u_pbc_knee_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,239" id="srcline239">239</a></span><span class="line">               u_pbc_ankle_prev = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,240" id="srcline240">240</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,241" id="srcline241">241</a></span><span class="line">        elseif Swing &amp;&amp; FootContact <span class="comment">%ditto, but for the other case</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,242" id="srcline242">242</a></span><span class="line">            if t_hold &lt; (time_in - t_switched_phase) </span></span>
+<span class="srcline"><span class="lineno"><a href="1,243" id="srcline243">243</a></span><span class="line">                <span class="comment">%Switch to STANCE</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,244" id="srcline244">244</a></span><span class="line">                t_switched_phase = time_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,245" id="srcline245">245</a></span><span class="line">                Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,246" id="srcline246">246</a></span><span class="line">                Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,247" id="srcline247">247</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,248" id="srcline248">248</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,249" id="srcline249">249</a></span><span class="line">        <span class="comment">%Manage torque smoothing when switching phases</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,250" id="srcline250">250</a></span><span class="line">        if Stance</span></span>
+<span class="srcline"><span class="lineno"><a href="1,251" id="srcline251">251</a></span><span class="line">            t_norm = (time_in - t_switched_phase)/(t_hold*0.8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,252" id="srcline252">252</a></span><span class="line">            StanceGain = min(t_norm,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,253" id="srcline253">253</a></span><span class="line">            SwingGain = 1-StanceGain; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,254" id="srcline254">254</a></span><span class="line">        elseif Swing</span></span>
+<span class="srcline"><span class="lineno"><a href="1,255" id="srcline255">255</a></span><span class="line">            t_norm = (time_in - t_switched_phase)/(t_hold*0.8);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,256" id="srcline256">256</a></span><span class="line">            SwingGain = min(t_norm,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,257" id="srcline257">257</a></span><span class="line">            StanceGain = 1-SwingGain; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,258" id="srcline258">258</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,259" id="srcline259">259</a></span><span class="line">    elseif int8(Command_State) == int8(1) <span class="comment">%Stance</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,260" id="srcline260">260</a></span><span class="line">        Stance = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,261" id="srcline261">261</a></span><span class="line">        Swing = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,262" id="srcline262">262</a></span><span class="line">        Hip_Pos_Max = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,263" id="srcline263">263</a></span><span class="line">        Hip_Pos_Min = - 20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,264" id="srcline264">264</a></span><span class="line">        StanceGain = 1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,265" id="srcline265">265</a></span><span class="line">        SwingGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,266" id="srcline266">266</a></span><span class="line">    elseif int8(Command_State) == int8(2) <span class="comment">%Swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,267" id="srcline267">267</a></span><span class="line">        Stance = false;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,268" id="srcline268">268</a></span><span class="line">        Swing = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,269" id="srcline269">269</a></span><span class="line">        Hip_Pos_Max = 23;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,270" id="srcline270">270</a></span><span class="line">        Hip_Pos_Min = - 20;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,271" id="srcline271">271</a></span><span class="line">        StanceGain = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,272" id="srcline272">272</a></span><span class="line">        SwingGain = 1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,273" id="srcline273">273</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,274" id="srcline274">274</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,275" id="srcline275">275</a></span><span class="line">    <span class="comment">%% Torque computation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,276" id="srcline276">276</a></span><span class="line">    if SLIP_ON       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,277" id="srcline277">277</a></span><span class="line">        Knee_torque_command_stance = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,278" id="srcline278">278</a></span><span class="line">        Ankle_torque_command_stance = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,279" id="srcline279">279</a></span><span class="line">        <span class="comment">%% Stance                </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,280" id="srcline280">280</a></span><span class="line">        <span class="comment">%Virtual spring</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,281" id="srcline281">281</a></span><span class="line">        <span class="comment">%MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,282" id="srcline282">282</a></span><span class="line">        u_lin_spring = -k.*(deltaL).*J_L';     </span></span>
+<span class="srcline"><span class="lineno"><a href="1,283" id="srcline283">283</a></span><span class="line">        u_lin_damp = -d.*(Ldot).*J_L';</span></span>
+<span class="srcline"><span class="lineno"><a href="1,284" id="srcline284">284</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,285" id="srcline285">285</a></span><span class="line">        U_LIN_DAMP_K = u_lin_damp(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,286" id="srcline286">286</a></span><span class="line">        U_LIN_DAMP_A = u_lin_damp(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,287" id="srcline287">287</a></span><span class="line">        U_LIN_SPRING_K = u_lin_spring(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,288" id="srcline288">288</a></span><span class="line">        U_LIN_SPRING_A = u_lin_spring(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,289" id="srcline289">289</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,290" id="srcline290">290</a></span><span class="line">        Knee_torque_command_stance  = Knee_torque_command_stance + U_LIN_DAMP_K + U_LIN_SPRING_K; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,291" id="srcline291">291</a></span><span class="line">        Ankle_torque_command_stance = Ankle_torque_command_stance + U_LIN_DAMP_A + U_LIN_SPRING_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,292" id="srcline292">292</a></span><span class="line">        if KPBC_ON <span class="comment">%Also use energy tracking controller   </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,293" id="srcline293">293</a></span><span class="line">            kappa = pbc_gain_knee;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,294" id="srcline294">294</a></span><span class="line">            u_r  = kappa*(Esys - Eref)*Ldot*J_L; </span></span>
+<span class="srcline"><span class="lineno"><a href="1,295" id="srcline295">295</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,296" id="srcline296">296</a></span><span class="line">            <span class="comment">%MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,297" id="srcline297">297</a></span><span class="line">            U_PBC_K = u_r(1); </span></span>
+<span class="srcline"><span class="lineno"><a href="1,298" id="srcline298">298</a></span><span class="line">            U_PBC_A = u_r(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,299" id="srcline299">299</a></span><span class="line">                         </span></span>
+<span class="srcline"><span class="lineno"><a href="1,300" id="srcline300">300</a></span><span class="line">            <span class="comment">%Moving average filter and saturation laws on value and rate of torque       </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,301" id="srcline301">301</a></span><span class="line">            <span class="comment">%Absolute saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,302" id="srcline302">302</a></span><span class="line">            if KPBC_max_torque&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,303" id="srcline303">303</a></span><span class="line">                U_PBC_K = Saturate(U_PBC_K,-KPBC_max_torque,KPBC_max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,304" id="srcline304">304</a></span><span class="line">                U_PBC_A = Saturate(U_PBC_A,-KPBC_max_torque,KPBC_max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,305" id="srcline305">305</a></span><span class="line">            end           </span></span>
+<span class="srcline"><span class="lineno"><a href="1,306" id="srcline306">306</a></span><span class="line">            <span class="comment">%Rate saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,307" id="srcline307">307</a></span><span class="line">            if KPBC_max_torque_rate&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,308" id="srcline308">308</a></span><span class="line">                dk = (U_PBC_K-u_pbc_knee_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,309" id="srcline309">309</a></span><span class="line">                da = (U_PBC_A-u_pbc_ankle_prev)/dt;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,310" id="srcline310">310</a></span><span class="line">                dk = Saturate(dk, -KPBC_max_torque_rate, KPBC_max_torque_rate);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,311" id="srcline311">311</a></span><span class="line">                da = Saturate(da, -KPBC_max_torque_rate, KPBC_max_torque_rate);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,312" id="srcline312">312</a></span><span class="line">                U_PBC_K = dk*dt+u_pbc_knee_prev;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,313" id="srcline313">313</a></span><span class="line">                U_PBC_A = da*dt+u_pbc_ankle_prev;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,314" id="srcline314">314</a></span><span class="line">            end           </span></span>
+<span class="srcline"><span class="lineno"><a href="1,315" id="srcline315">315</a></span><span class="line">            <span class="comment">%Exponential smoothing of torque</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,316" id="srcline316">316</a></span><span class="line">            U_PBC_K = (1-KPBC_filter_coeff)*u_pbc_knee_prev + KPBC_filter_coeff*U_PBC_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,317" id="srcline317">317</a></span><span class="line">            U_PBC_A = (1-KPBC_filter_coeff)*u_pbc_ankle_prev + KPBC_filter_coeff*U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,318" id="srcline318">318</a></span><span class="line">            </span></span>
+<span class="srcline"><span class="lineno"><a href="1,319" id="srcline319">319</a></span><span class="line">            <span class="comment">%Biomemetic power saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,320" id="srcline320">320</a></span><span class="line">            if Joint_Bio_Sat               </span></span>
+<span class="srcline"><span class="lineno"><a href="1,321" id="srcline321">321</a></span><span class="line">                Pow_Knee = knee_vel*U_PBC_K ;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,322" id="srcline322">322</a></span><span class="line">                Pow_Ankle = ankle_vel*U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,323" id="srcline323">323</a></span><span class="line">                if sign(Pow_Ankle) == -1</span></span>
+<span class="srcline"><span class="lineno"><a href="1,324" id="srcline324">324</a></span><span class="line">                    U_PBC_A = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,325" id="srcline325">325</a></span><span class="line">                end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,326" id="srcline326">326</a></span><span class="line">                if sign(Pow_Knee) == 1</span></span>
+<span class="srcline"><span class="lineno"><a href="1,327" id="srcline327">327</a></span><span class="line">                    U_PBC_K = 0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,328" id="srcline328">328</a></span><span class="line">                end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,329" id="srcline329">329</a></span><span class="line">            end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,330" id="srcline330">330</a></span><span class="line">            Knee_torque_command_stance = Knee_torque_command_stance + U_PBC_K - U_LIN_DAMP_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,331" id="srcline331">331</a></span><span class="line">            Ankle_torque_command_stance = Ankle_torque_command_stance + U_PBC_A - U_LIN_DAMP_A;          </span></span>
+<span class="srcline"><span class="lineno"><a href="1,332" id="srcline332">332</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,333" id="srcline333">333</a></span><span class="line">        <span class="comment">%% Swing</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,334" id="srcline334">334</a></span><span class="line">        Knee_torque_command_swing=0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,335" id="srcline335">335</a></span><span class="line">        Ankle_torque_command_swing=0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,336" id="srcline336">336</a></span><span class="line">        if IMU_LIVE</span></span>
+<span class="srcline"><span class="lineno"><a href="1,337" id="srcline337">337</a></span><span class="line">            <span class="comment">%Use hip pos as phase variable to index winters data</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,338" id="srcline338">338</a></span><span class="line">            [knee_des_out ,~,ankle_des_out,~]=winterFit(phase_var_out*1000,a_knee,a_ankle,knee_ind,ankle_ind);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,339" id="srcline339">339</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,340" id="srcline340">340</a></span><span class="line">            <span class="comment">%follow the trjactory via PD controller</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,341" id="srcline341">341</a></span><span class="line">            [Knee_torque_command_swing,Ankle_torque_command_swing] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,342" id="srcline342">342</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,343" id="srcline343">343</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,344" id="srcline344">344</a></span><span class="line">       </span></span>
+<span class="srcline"><span class="lineno"><a href="1,345" id="srcline345">345</a></span><span class="line">        else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,346" id="srcline346">346</a></span><span class="line">            knee_des_out = knee_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,347" id="srcline347">347</a></span><span class="line">            ankle_des_out = ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,348" id="srcline348">348</a></span><span class="line">            [Knee_torque_command_swing,Ankle_torque_command_swing] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,349" id="srcline349">349</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,350" id="srcline350">350</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,351" id="srcline351">351</a></span><span class="line">        end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,352" id="srcline352">352</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,353" id="srcline353">353</a></span><span class="line">        <span class="comment">%Smooth between stance and swing torques</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,354" id="srcline354">354</a></span><span class="line">        Knee_torque_command = StanceGain*Knee_torque_command_stance + SwingGain*Knee_torque_command_swing;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,355" id="srcline355">355</a></span><span class="line">        Ankle_torque_command = StanceGain*Ankle_torque_command_stance + SwingGain*Ankle_torque_command_swing;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,356" id="srcline356">356</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,357" id="srcline357">357</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,358" id="srcline358">358</a></span><span class="line">        IMU_LIVE = true;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,359" id="srcline359">359</a></span><span class="line">        <span class="comment">%Use Setpoint PD control</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,360" id="srcline360">360</a></span><span class="line">        knee_des_out = knee_des_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,361" id="srcline361">361</a></span><span class="line">        ankle_des_out = ankle_des_in;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,362" id="srcline362">362</a></span><span class="line">        [Knee_torque_command,Ankle_torque_command] = PDControl(...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,363" id="srcline363">363</a></span><span class="line">            kp_knee, kd_knee, knee_des_out, knee_pos, knee_vel, ...</span></span>
+<span class="srcline"><span class="lineno"><a href="1,364" id="srcline364">364</a></span><span class="line">            kp_ankle, kd_ankle, ankle_des_out, ankle_pos, ankle_vel);        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,365" id="srcline365">365</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,366" id="srcline366">366</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,367" id="srcline367">367</a></span><span class="line">    <span class="comment">%% Friction Compensation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,368" id="srcline368">368</a></span><span class="line">    <span class="comment">%v0 = 0.01;</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,369" id="srcline369">369</a></span><span class="line">    tau0 = 5;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,370" id="srcline370">370</a></span><span class="line">    if Fric_Comp</span></span>
+<span class="srcline"><span class="lineno"><a href="1,371" id="srcline371">371</a></span><span class="line">        Knee_torque_command = friction_compensation(knee_vel,Knee_torque_command ,v0,tau0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,372" id="srcline372">372</a></span><span class="line">        Ankle_torque_command = friction_compensation(ankle_vel,Ankle_torque_command ,v0,tau0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,373" id="srcline373">373</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,374" id="srcline374">374</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,375" id="srcline375">375</a></span><span class="line">    <span class="comment">%% Virtual hard stops</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,376" id="srcline376">376</a></span><span class="line">    u_stop = zeros(2,1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,377" id="srcline377">377</a></span><span class="line">    if knee_stop_low &lt; knee_stop_high &amp;&amp; ankle_stop_low &lt; ankle_stop_high</span></span>
+<span class="srcline"><span class="lineno"><a href="1,378" id="srcline378">378</a></span><span class="line">        knee_limits = [knee_stop_low, knee_stop_high];  <span class="comment">%deg, need to make sure its ordered</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,379" id="srcline379">379</a></span><span class="line">        ankle_limits = [ankle_stop_low, ankle_stop_high];</span></span>
+<span class="srcline"><span class="lineno"><a href="1,380" id="srcline380">380</a></span><span class="line">    else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,381" id="srcline381">381</a></span><span class="line">        knee_limits = single([KNEE_POS_MIN_LIM, KNEE_POS_MAX_LIM]);  <span class="comment">%deg, need to make sure its ordered</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,382" id="srcline382">382</a></span><span class="line">        ankle_limits = single([ANKLE_POS_MIN_LIM, ANKLE_POS_MAX_LIM]);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,383" id="srcline383">383</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,384" id="srcline384">384</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,385" id="srcline385">385</a></span><span class="line">    if knee_pos &lt; knee_limits(1)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,386" id="srcline386">386</a></span><span class="line">        u_stop(1) = -kp_knee*(knee_pos - knee_limits(1)) - kd_knee*(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,387" id="srcline387">387</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,388" id="srcline388">388</a></span><span class="line">    if knee_limits(2) &lt; knee_pos </span></span>
+<span class="srcline"><span class="lineno"><a href="1,389" id="srcline389">389</a></span><span class="line">        u_stop(1) = -kp_knee*(knee_pos - knee_limits(2)) - kd_knee*(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,390" id="srcline390">390</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,391" id="srcline391">391</a></span><span class="line">    if ankle_pos &lt; ankle_limits(1)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,392" id="srcline392">392</a></span><span class="line">        u_stop(2) = -kp_ankle*(ankle_pos - ankle_limits(1)) - kd_ankle*(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,393" id="srcline393">393</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,394" id="srcline394">394</a></span><span class="line">    if ankle_limits(2) &lt; ankle_pos</span></span>
+<span class="srcline"><span class="lineno"><a href="1,395" id="srcline395">395</a></span><span class="line">        u_stop(2) = -kp_ankle*(ankle_pos - ankle_limits(2)) - kd_ankle*(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,396" id="srcline396">396</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,397" id="srcline397">397</a></span><span class="line">    U_STOP_K = u_stop(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,398" id="srcline398">398</a></span><span class="line">    U_STOP_A = u_stop(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,399" id="srcline399">399</a></span><span class="line">    Knee_torque_command = Knee_torque_command + u_stop(1);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,400" id="srcline400">400</a></span><span class="line">    Ankle_torque_command = Ankle_torque_command + u_stop(2);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,401" id="srcline401">401</a></span><span class="line">    </span></span>
+<span class="srcline"><span class="lineno"><a href="1,402" id="srcline402">402</a></span><span class="line">    <span class="comment">%% Saturate torque output</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,403" id="srcline403">403</a></span><span class="line">    if max_torque&gt;0</span></span>
+<span class="srcline"><span class="lineno"><a href="1,404" id="srcline404">404</a></span><span class="line">        Knee_torque_command = Saturate(Knee_torque_command,-max_torque,max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,405" id="srcline405">405</a></span><span class="line">        Ankle_torque_command = Saturate(Ankle_torque_command,-max_torque,max_torque);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,406" id="srcline406">406</a></span><span class="line">    end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,407" id="srcline407">407</a></span><span class="line">        </span></span>
+<span class="srcline"><span class="lineno"><a href="1,408" id="srcline408">408</a></span><span class="line">    <span class="comment">%% Persistent/output variable management</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,409" id="srcline409">409</a></span><span class="line">    Esys_integrate_out = Esys_integrate;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,410" id="srcline410">410</a></span><span class="line">    knee_pos_prev = knee_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,411" id="srcline411">411</a></span><span class="line">    ankle_pos_prev = ankle_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,412" id="srcline412">412</a></span><span class="line">    knee_vel_prev=knee_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,413" id="srcline413">413</a></span><span class="line">    ankle_vel_prev=ankle_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,414" id="srcline414">414</a></span><span class="line">    IMU_pitch_prev=IMU_pitch;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,415" id="srcline415">415</a></span><span class="line">    hip_vel_prev = hip_vel;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,416" id="srcline416">416</a></span><span class="line">    hip_pos_prev = hip_pos;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,417" id="srcline417">417</a></span><span class="line">    u_pbc_knee_prev = U_PBC_K;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,418" id="srcline418">418</a></span><span class="line">    u_pbc_ankle_prev = U_PBC_A;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,419" id="srcline419">419</a></span><span class="line">    knee_joint_vel = single(knee_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,420" id="srcline420">420</a></span><span class="line">    ankle_joint_vel = single(ankle_vel);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,421" id="srcline421">421</a></span><span class="line">    foot_contact = single(FootContact);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,422" id="srcline422">422</a></span><span class="line">    stance = single(Stance);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,423" id="srcline423">423</a></span><span class="line">    swing = single(Swing);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,424" id="srcline424">424</a></span><span class="line">    IMU_LIVE_OUT = single(IMU_LIVE);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,425" id="srcline425">425</a></span><span class="line">    PushOffOut = single(PushOff);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,426" id="srcline426">426</a></span><span class="line">end</span></span>
+</pre>
+</div>
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,427" id="srcline427">427</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,428" id="srcline428">428</a></span><span class="line"><span class="comment">%% Helper functions</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,429" id="srcline429">429</a></span><span class="line"><span class="keyword">function</span> [<span class="var type1" id="S176T1U1775">Knee_torque_command</span>,<span class="var type1" id="S177T1U1776">Ankle_torque_command</span>] = PDControl(<span class="var type1" id="S178T1U1779">kp_k</span>, <span class="var type1" id="S179T1U1780">kd_k</span>, <span class="var type1" id="S180T1U1781">q_kstar</span>, <span class="var type1" id="S181T1U1782">q_k</span>, <span class="var type1" id="S182T1U1783">qdot_k</span>, <span class="var type1" id="S183T1U1784">kp_a</span>, <span class="var type1" id="S184T1U1785">kd_a</span>, <span class="var type1" id="S185T1U1786">q_astar</span>, <span class="var type1" id="S186T1U1787">q_a</span>, <span class="var type1" id="S187T1U1788">qdot_a</span>)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,430" id="srcline430">430</a></span><span class="line">    <span class="comment">%This control basically assumes that the desired joint angles are static i.e., the desired velocities are all zero.</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,431" id="srcline431">431</a></span><span class="line">    <span class="mxinfo " id="T1:U13"><span class="var type1" id="S176T1U1791">Knee_torque_command</span> = <span class="mxinfo  sgl" id="T1:U15"><span class="mxinfo  sgl" id="T1:U16"><span class="var type1" id="S178T1U1794">kp_k</span>*(<span class="mxinfo  sgl" id="T1:U18"><span class="var type1" id="S180T1U1797">q_kstar</span> - <span class="var type1" id="S181T1U1798">q_k</span></span>)</span> + <span class="mxinfo  sgl" id="T1:U21"><span class="var type1" id="S179T1U1800">kd_k</span>*(<span class="mxinfo  sgl" id="T1:U23">-<span class="var type1" id="S182T1U1803">qdot_k</span></span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,432" id="srcline432">432</a></span><span class="line">    <span class="mxinfo " id="T1:U25"><span class="var type1" id="S177T1U1806">Ankle_torque_command</span> = <span class="mxinfo  sgl" id="T1:U27"><span class="mxinfo  sgl" id="T1:U28"><span class="var type1" id="S183T1U1809">kp_a</span>*(<span class="mxinfo  sgl" id="T1:U30"><span class="var type1" id="S185T1U1812">q_astar</span> - <span class="var type1" id="S186T1U1813">q_a</span></span>)</span> + <span class="mxinfo  sgl" id="T1:U33"><span class="var type1" id="S184T1U1815">kd_a</span>*(<span class="mxinfo  sgl" id="T1:U35">-<span class="var type1" id="S187T1U1818">qdot_a</span></span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,433" id="srcline433">433</a></span><span class="line"><span class="keyword">end</span></span></span>
+</pre>
+<div class="dead">
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,434" id="srcline434">434</a></span><span class="line">function y = Saturate(x,L1,L2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,435" id="srcline435">435</a></span><span class="line">    <span class="comment">%Function to prevent the desired joint angles from changing to fast. </span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,436" id="srcline436">436</a></span><span class="line">    <span class="comment">%Works via saturation</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,437" id="srcline437">437</a></span><span class="line">    y = min(x,max(L1,L2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,438" id="srcline438">438</a></span><span class="line">    y = max(y,min(L1,L2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,439" id="srcline439">439</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,440" id="srcline440">440</a></span><span class="line">function tau_com_w_fric=friction_compensation(v,tau_com,v0,tau0)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,441" id="srcline441">441</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,442" id="srcline442">442</a></span><span class="line">f_k_n=-1.7;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,443" id="srcline443">443</a></span><span class="line">f_s_n=-2.8;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,444" id="srcline444">444</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,445" id="srcline445">445</a></span><span class="line">f_s_p=1.6;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,446" id="srcline446">446</a></span><span class="line">f_k_p=0.8;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,447" id="srcline447">447</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,448" id="srcline448">448</a></span><span class="line">r_v_p=sat_one(v,0,v0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,449" id="srcline449">449</a></span><span class="line">r_v_n=sat_one(v,-v0,0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,450" id="srcline450">450</a></span><span class="line">r_t_p=sat_one(tau_com,0,tau0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,451" id="srcline451">451</a></span><span class="line">r_t_n=sat_one(tau_com,-tau0,0);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,452" id="srcline452">452</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,453" id="srcline453">453</a></span><span class="line">tau_fric=r_v_p*f_k_p+(1-r_v_n)*f_k_n+(1-r_v_p)*r_v_n*(r_t_p*f_s_p+(1-r_t_n)*f_s_n);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,454" id="srcline454">454</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,455" id="srcline455">455</a></span><span class="line">tau_com_w_fric=tau_com+tau_fric;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,456" id="srcline456">456</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,457" id="srcline457">457</a></span><span class="line">function y=sat_one(x,a,b)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,458" id="srcline458">458</a></span><span class="line">if x&lt;a</span></span>
+<span class="srcline"><span class="lineno"><a href="1,459" id="srcline459">459</a></span><span class="line">    y=0;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,460" id="srcline460">460</a></span><span class="line">elseif x&lt;b</span></span>
+<span class="srcline"><span class="lineno"><a href="1,461" id="srcline461">461</a></span><span class="line">    y=(x-a)/(b-a);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,462" id="srcline462">462</a></span><span class="line">else</span></span>
+<span class="srcline"><span class="lineno"><a href="1,463" id="srcline463">463</a></span><span class="line">    y=1;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,464" id="srcline464">464</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,465" id="srcline465">465</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,466" id="srcline466">466</a></span><span class="line">function [knee_r,dknee_r,ankle_r,dankle_r] = winterFit(n,a_knee,a_ankle,knee_ind,ankle_ind)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,467" id="srcline467">467</a></span><span class="line">m1=2;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,468" id="srcline468">468</a></span><span class="line">m2=6;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,469" id="srcline469">469</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,470" id="srcline470">470</a></span><span class="line">c_n_knee=n-knee_ind;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,471" id="srcline471">471</a></span><span class="line">j_knee=length(c_n_knee(c_n_knee&gt;=0));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,472" id="srcline472">472</a></span><span class="line">x=(n-knee_ind(j_knee))/(knee_ind(j_knee+1)-knee_ind(j_knee));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,473" id="srcline473">473</a></span><span class="line">knee_r=a_knee(j_knee,1)*(x-1).^m1+a_knee(j_knee,2)*(x-1).^m2+a_knee(j_knee,4)*(x-1)+a_knee(j_knee,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,474" id="srcline474">474</a></span><span class="line">dknee_r=(m1*a_knee(j_knee,1)*(x-1).^(m1-1)+m2*a_knee(j_knee,2)*(x-1).^(m2-1)+a_knee(j_knee,4))/(knee_ind(j_knee+1)-knee_ind(j_knee));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,475" id="srcline475">475</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,476" id="srcline476">476</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,477" id="srcline477">477</a></span><span class="line">c_n_ankle=n-ankle_ind;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,478" id="srcline478">478</a></span><span class="line">j_ankle=length(c_n_ankle(c_n_ankle&gt;=0));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,479" id="srcline479">479</a></span><span class="line">x=(n-ankle_ind(j_ankle))/(ankle_ind(j_ankle+1)-ankle_ind(j_ankle));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,480" id="srcline480">480</a></span><span class="line">ankle_r=a_ankle(j_ankle,1)*(x-1).^m1+a_ankle(j_ankle,2)*(x-1).^m2+a_ankle(j_ankle,4)*(x-1)+a_ankle(j_ankle,3);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,481" id="srcline481">481</a></span><span class="line">dankle_r=(m1*a_ankle(j_ankle,1)*(x-1).^(m1-1)+m2*a_ankle(j_ankle,2)*(x-1).^(m2-1)+a_ankle(j_ankle,4))/(ankle_ind(j_ankle+1)-ankle_ind(j_ankle));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,482" id="srcline482">482</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,483" id="srcline483">483</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,484" id="srcline484">484</a></span><span class="line">function y = clamp(x,x1,x2)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,485" id="srcline485">485</a></span><span class="line">y=min(x,max(x1,x2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,486" id="srcline486">486</a></span><span class="line">y=max(y,min(x1,x2));</span></span>
+<span class="srcline"><span class="lineno"><a href="1,487" id="srcline487">487</a></span><span class="line">end</span></span>
+<span class="srcline"><span class="lineno"><a href="1,488" id="srcline488">488</a></span><span class="line"> </span></span>
+</pre>
+</div>

@@ -5,14 +5,13 @@
  * File: SLIP_KPBC_terminate.h
  *
  * MATLAB Coder version            : 3.2
- * C/C++ source code generated on  : 01-Jul-2020 11:22:48
+ * C/C++ source code generated on  : 31-Aug-2020 12:07:22
  */
 
 #ifndef SLIP_KPBC_TERMINATE_H
 #define SLIP_KPBC_TERMINATE_H
 
 /* Include Files */
-#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>

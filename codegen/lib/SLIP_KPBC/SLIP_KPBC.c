@@ -5,15 +5,12 @@
  * File: SLIP_KPBC.c
  *
  * MATLAB Coder version            : 3.2
- * C/C++ source code generated on  : 01-Jul-2020 11:22:48
+ * C/C++ source code generated on  : 31-Aug-2020 12:07:22
  */
 
 /* Include Files */
 #include "rt_nonfinite.h"
 #include "SLIP_KPBC.h"
-#include "sind.h"
-#include "cosd.h"
-#include "SLIP_KPBC_rtwutil.h"
 
 /* Variable Definitions */
 static float hip_pos_prev;
@@ -29,9 +26,11 @@ static boolean_T Swing;
 static float ForceCount;
 static float u_pbc_knee_prev;
 static float u_pbc_ankle_prev;
+static float COP_prev;
 
 /* Function Declarations */
 static float rt_powf_snf(float u0, float u1);
+static float rt_roundf_snf(float u);
 
 /* Function Definitions */
 
@@ -43,17 +42,17 @@ static float rt_powf_snf(float u0, float u1);
 static float rt_powf_snf(float u0, float u1)
 {
   float y;
+  float f0;
   float f1;
-  float f2;
   if (rtIsNaNF(u0) || rtIsNaNF(u1)) {
     y = ((real32_T)rtNaN);
   } else {
-    f1 = (float)fabs(u0);
-    f2 = (float)fabs(u1);
+    f0 = (float)fabs(u0);
+    f1 = (float)fabs(u1);
     if (rtIsInfF(u1)) {
-      if (f1 == 1.0F) {
+      if (f0 == 1.0F) {
         y = ((real32_T)rtNaN);
-      } else if (f1 > 1.0F) {
+      } else if (f0 > 1.0F) {
         if (u1 > 0.0F) {
           y = ((real32_T)rtInf);
         } else {
@@ -64,9 +63,9 @@ static float rt_powf_snf(float u0, float u1)
       } else {
         y = ((real32_T)rtInf);
       }
-    } else if (f2 == 0.0F) {
+    } else if (f1 == 0.0F) {
       y = 1.0F;
-    } else if (f2 == 1.0F) {
+    } else if (f1 == 1.0F) {
       if (u1 > 0.0F) {
         y = u0;
       } else {
@@ -81,6 +80,28 @@ static float rt_powf_snf(float u0, float u1)
     } else {
       y = (float)pow(u0, u1);
     }
+  }
+
+  return y;
+}
+
+/*
+ * Arguments    : float u
+ * Return Type  : float
+ */
+static float rt_roundf_snf(float u)
+{
+  float y;
+  if ((float)fabs(u) < 8.388608E+6F) {
+    if (u >= 0.5F) {
+      y = (float)floor(u + 0.5F);
+    } else if (u > -0.5F) {
+      y = u * 0.0F;
+    } else {
+      y = (float)ceil(u - 0.5F);
+    }
+  } else {
+    y = u;
   }
 
   return y;
@@ -115,15 +136,15 @@ static float rt_powf_snf(float u0, float u1)
  *                float KPBC_ON
  *                float KPBC_max_torque_rate
  *                float pbc_gain_knee
- *                float M
+ *                float md
  *                float Eref
  *                float knee_stop_low
  *                float knee_stop_high
  *                float ankle_stop_low
  *                float ankle_stop_high
  *                float max_torque
- *                float k_tilde
- *                float Ignore_PushOff
+ *                float v0
+ *                float Fric_Comp
  *                float F_thresh
  *                float Command_State
  *                float KPBC_max_torque
@@ -134,9 +155,9 @@ static float rt_powf_snf(float u0, float u1)
  *                float *hip_pos
  *                float *Esys
  *                float *Esys_integrate_out
- *                float *U_LIN_SPRING_K
- *                float *U_LIN_SPRING_A
- *                float *U_LIN_DAMP_K
+ *                float *U_S_KNEE
+ *                float *U_S_ANKLE
+ *                float *COPFX
  *                float *U_LIN_DAMP_A
  *                float *U_STOP_K
  *                float *U_STOP_A
@@ -166,53 +187,49 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
                float knee_des_in, float vel_filter_coeff, float
                KPBC_filter_coeff, float SLIP_ON, float lt, float k, float d,
                float L0, float KPBC_ON, float KPBC_max_torque_rate, float
-               pbc_gain_knee, float M, float Eref, float knee_stop_low, float
+               pbc_gain_knee, float md, float Eref, float knee_stop_low, float
                knee_stop_high, float ankle_stop_low, float ankle_stop_high,
-               float max_torque, float k_tilde, float Ignore_PushOff, float
-               F_thresh, float Command_State, float KPBC_max_torque, float
-               Joint_Bio_Sat, float *Knee_torque_command, float
-               *Ankle_torque_command, float *deltaL, float *hip_pos, float *Esys,
-               float *Esys_integrate_out, float *U_LIN_SPRING_K, float
-               *U_LIN_SPRING_A, float *U_LIN_DAMP_K, float *U_LIN_DAMP_A, float *
-               U_STOP_K, float *U_STOP_A, float *U_PBC_K, float *U_PBC_A, float *
-               knee_des_out, float *ankle_des_out, float *foot_contact, float
-               *stance, float *swing, float *phase_var_out, float *IMU_LIVE_OUT,
-               float *StanceGain, float *SwingGain, float *knee_joint_vel, float
-               *ankle_joint_vel, float *hip_vel, float *PushOffOut)
+               float max_torque, float v0, float Fric_Comp, float F_thresh,
+               float Command_State, float KPBC_max_torque, float Joint_Bio_Sat,
+               float *Knee_torque_command, float *Ankle_torque_command, float
+               *deltaL, float *hip_pos, float *Esys, float *Esys_integrate_out,
+               float *U_S_KNEE, float *U_S_ANKLE, float *COPFX, float
+               *U_LIN_DAMP_A, float *U_STOP_K, float *U_STOP_A, float *U_PBC_K,
+               float *U_PBC_A, float *knee_des_out, float *ankle_des_out, float *
+               foot_contact, float *stance, float *swing, float *phase_var_out,
+               float *IMU_LIVE_OUT, float *StanceGain, float *SwingGain, float
+               *knee_joint_vel, float *ankle_joint_vel, float *hip_vel, float
+               *PushOffOut)
 {
-  float t7;
-  float f0;
-  float t8;
-  float t11;
-  float t14;
-  float value;
-  float t19;
-  float t20;
-  float t23;
-  float t27;
-  float t24;
-  float t25;
-  float t26;
-  float t28;
-  float t33;
-  float t29;
-  float t30;
-  float J[5];
-  boolean_T IMU_LIVE;
   float x[3];
+  float M0_idx_0;
+  float scale;
   int i;
+  float M0_idx_2;
   boolean_T FootContact;
+  float Pow_Ankle;
+  float b_x[4];
+  float F[3];
+  float c[3];
+  static const signed char a[3] = { 0, 0, 1 };
+
+  float t6;
+  float c_x;
+  float t12;
+  float t19;
+  float J_L[2];
+  boolean_T IMU_LIVE;
   signed char i0;
-  float u_lin_spring[5];
-  float u_lin_damp[5];
-  float u_stop[2];
-  float knee_limits[2];
-  float ankle_limits[2];
+  float u_lin_spring[2];
+  float u_lin_damp[2];
   int trueCount;
+  float b_Knee_torque_command;
+  float ankle_limits[2];
   static const short iv0[8] = { 1, 139, 400, 530, 720, 848, 976, 1001 };
 
   static const short knee_ind[8] = { 1, 139, 400, 530, 720, 848, 976, 1001 };
 
+  float c_Knee_torque_command;
   static const float a_knee[28] = { -21.9472504F, 20.9295F, 15.9362497F,
     -59.8412514F, -19.4405F, 45.107F, 1.42525F, 4.24525F, -6.9765F, -0.99825F,
     13.6422501F, -1.4025F, -7.153F, 0.06575F, 21.672F, 7.719F, 18.664F, 64.863F,
@@ -231,14 +248,12 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
     0.58F, 0.0F, 4.6512F, 2.8125F, 0.0F, -24.244F, 0.0F, 0.0F, 0.0F, 0.0F,
     -1.344F };
 
-  float b_t20;
-  float b_t7;
-  float b_t26;
-  float c_t7;
-  (void)Load_cell_x_moment;
-  (void)Load_cell_y_moment;
-  (void)Load_cell_z_moment;
-  (void)Ignore_PushOff;
+  float b_Ankle_torque_command;
+  float c_Ankle_torque_command;
+  float b_Pow_Ankle;
+  float b_scale;
+  float c_Pow_Ankle;
+  float c_scale;
 
   /*  Knee_joint_position, Ankle_joint_position are in degrees, in a */
   /*  "biomechanics frame" */
@@ -255,28 +270,22 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
   }
 
   /*     %% Initialization and Hard Coded Values */
-  /* Knee_torque_command = 0;  */
-  /* Ankle_torque_command = 0;  */
-  /* deltaL = single(0); %meters */
-  /* Esys = single(0); %Joules */
-  /* g = single(9.81); %m/s^2 */
-  /* pulse_length = single(10); %seconds */
-  /* hip_pos = 0;  */
-  /* t_out = 0;  */
-  /* dt = 0; */
-  /*  converted to kg */
-  /* carbon fiber foot + mechanism, kg */
+  /* params = [Ms,Mf,Isz,Ifz,lt,ls,lc,la,rs,rfy,rfx,COPfx,g]; */
+  /*  converted lb to kg */
+  /*  converted lb to kg */
+  /* kg*m^2 */
+  /* kg*m^2 */
   /* lt = single(0.3733); %meters */
   /* meters */
   /* meters */
   /* meters */
   /* meters */
   /* meters */
-  /* From ordering in makeMatlabFunctionsProthesisTestBench */
-  *U_LIN_DAMP_K = 0.0F;
+  /* meters */
+  /* meters/s^2; */
   *U_LIN_DAMP_A = 0.0F;
-  *U_LIN_SPRING_K = 0.0F;
-  *U_LIN_SPRING_A = 0.0F;
+  *U_S_KNEE = 0.0F;
+  *U_S_ANKLE = 0.0F;
   *U_PBC_K = 0.0F;
   *U_PBC_A = 0.0F;
 
@@ -285,7 +294,6 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
   /* deg/s */
   /* deg/s */
   /* deg/s */
-  /* joules */
   /* Winters Data Arrays */
   /*     %% State Calculations */
   /* Assign joint positions */
@@ -300,159 +308,26 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
   ankle_vel_prev = (1.0F - vel_filter_coeff) * ankle_vel_prev + vel_filter_coeff
     * (Ankle_joint_position - ankle_pos_prev) / dt;
 
-  /* Human Leg as a Robot states */
-  /* x,y,-knee ankle, ankle angle */
-  /* reverse knee sign convention of biomechanics versus biped modeling      */
-  /* reverse knee sign convention of biomechanics versus biped modeling */
-  /* Virtual linear spring from hip to foot, l1 is shank length, l2 is thigh length      */
-  /* SPRING_JACOBIAN_FUNC */
-  /*     LJACOB = SPRING_JACOBIAN_FUNC(IN1,IN2) */
-  /*     This function was generated by the Symbolic Math Toolbox version 8.3. */
-  /*     31-Jan-2020 14:49:45 */
-  /* Prosthesis file. Needs state and parameters as inputs */
-  t7 = -Knee_joint_position + Ankle_joint_position;
-  f0 = 0.0F;
-  cosd(&f0);
-  t8 = lt * f0;
-  f0 = 0.0F;
-  sind(&f0);
-  t11 = lt * f0;
-  t14 = -Knee_joint_position + Ankle_joint_position;
-  value = t14;
-  cosd(&value);
-  sind(&t14);
-  f0 = -Knee_joint_position;
-  cosd(&f0);
-  t19 = 0.3733F * f0;
-  f0 = -Knee_joint_position;
-  sind(&f0);
-  t20 = 0.3733F * f0;
-  f0 = t7;
-  cosd(&f0);
-  t23 = 0.15F * lt * f0;
-  sind(&t7);
-  t27 = 0.0628F * lt * t7;
-  t24 = 0.0F * t19;
-  t25 = 0.0628F * value;
-  t26 = 0.15F * value;
-  t28 = 0.0F * t20;
-  t33 = t14 * 0.0F;
-  t29 = 0.0F * t25;
-  t30 = 0.0F * t26;
-  t7 = ((t11 + t20) + 0.0628F * t14) + t26;
-  t20 = ((t8 + t19) + t25) + -(0.15F * t14);
-  t14 = 1.0F / (float)sqrt(t20 * t20 + t7 * t7);
-  f0 = -Knee_joint_position;
-  sind(&f0);
-  t20 = Ankle_joint_position;
-  cosd(&t20);
-  t26 = Ankle_joint_position;
-  sind(&t26);
-  J[0] = 0.0F;
-  J[1] = 0.0F;
-  J[2] = -t14 * ((((((t24 + t28) + t29) + t30) + t33) + 0.0F * t8) + 0.0F * t11);
-  J[3] = -t14 * ((((((t23 + t24) + t27) + t28) + t33) + value * 0.0F) + 0.3733F *
-                 lt * f0);
-  J[4] = -t14 * ((((((t23 + t27) + t29) + t30) + t33) + 0.055995F * t20) +
-                 0.0234432388F * t26);
-
-  /* SPRING_LENGTH_FUNC */
-  /*     L1 = SPRING_LENGTH_FUNC(IN1,IN2) */
-  /*     This function was generated by the Symbolic Math Toolbox version 8.3. */
-  /*     31-Jan-2020 14:49:42 */
-  /* Prosthesis file. Needs state and parameters as inputs */
-  t7 = -Knee_joint_position + Ankle_joint_position;
-  value = t7;
-  cosd(&value);
-  sind(&t7);
-  f0 = -Knee_joint_position;
-  sind(&f0);
-  t20 = 0.0F;
-  sind(&t20);
-  t24 = ((0.0628F * t7 + 0.15F * value) + 0.3733F * f0) + lt * t20;
-  f0 = -Knee_joint_position;
-  cosd(&f0);
-  t20 = 0.0F;
-  cosd(&t20);
-  t19 = ((0.0628F * value - 0.15F * t7) + 0.3733F * f0) + lt * t20;
-  *deltaL = (float)sqrt(t24 * t24 + t19 * t19) - L0;
-
-  /* SPRING_VEL_FUNC */
-  /*     L1DOT = SPRING_VEL_FUNC(IN1,IN2) */
-  /*     This function was generated by the Symbolic Math Toolbox version 8.3. */
-  /*     31-Jan-2020 14:49:44 */
-  /* Prosthesis file. Needs state and parameters as inputs */
-  value = 0.0F;
-  cosd(&value);
-  t20 = 0.0F;
-  sind(&t20);
-  t14 = -Knee_joint_position;
-  cosd(&t14);
-  t26 = -Knee_joint_position;
-  sind(&t26);
-  t8 = -Knee_joint_position + Ankle_joint_position;
-  t7 = -knee_vel_prev + ankle_vel_prev;
-  t25 = t8;
-  cosd(&t25);
-  sind(&t8);
-  t24 = ((0.0628F * t25 - 0.15F * t8) + 0.3733F * t14) + lt * value;
-  t19 = ((0.0628F * t8 + 0.15F * t25) + 0.3733F * t26) + lt * t20;
-  t25 = 1.0F / (float)sqrt(t24 * t24 + t19 * t19) * ((((0.0628F * t7 * t25 -
-    0.15F * t7 * t8) + 0.3733F * -knee_vel_prev * t14) + lt * value * 0.0F) *
-    (((0.0628F * t8 * 2.0F + 0.15F * t25 * 2.0F) + 0.3733F * t26 * 2.0F) + lt *
-     t20 * 2.0F) - (((0.0628F * t7 * t8 + 0.15F * t7 * t25) + 0.3733F *
-                     -knee_vel_prev * t26) + lt * t20 * 0.0F) * (((0.0628F * t25
-    * 2.0F - 0.15F * t8 * 2.0F) + 0.3733F * t14 * 2.0F) + lt * value * 2.0F)) /
-    2.0F;
-
-  /* Calculate system energy */
-  /* Ehip = 1/2*M*(Ldot^2) + (L-L0)*M*g; %kinetic and potential energy of slip model */
-  /* virtual spring potential energy */
-  /* KE_func(x,params); */
-  /* PE = PE_func(x,params); */
-  *Esys = 0.5F * k_tilde * (*deltaL * *deltaL) + 0.5F * M * (t25 * t25);
-
-  /* Espring + PE + KE; */
-  /* Phase Variable  */
-  /* s_a=clamp(1+(1-s_m)/(q_h_0-q_h_m)*(hip-q_h_0),0,1); */
-  t24 = 0.4F * (IMU_pitch - -20.0F) / 43.0F;
-  if (0.6F + t24 <= 1.0F) {
-    t26 = 0.6F + t24;
-  } else {
-    t26 = 1.0F;
-  }
-
-  if (t26 >= 0.6F) {
-    *phase_var_out = t26;
-  } else {
-    *phase_var_out = 0.6F;
-  }
-
-  /* IMU State check */
-  IMU_LIVE = ((float)fabs(hip_pos_prev - IMU_pitch) < 1.0F);
-
-  /* PushOff = and(or((hip_pos < hip_thresh_st),PushOff),Stance); %PushOff is persistent, so this remembers when the hip_pos crosses and stays high until Stance is off */
-  /*     %% Control logic */
-  /* Determine foot contact */
+  /*     %% Determine foot contact */
   x[0] = Load_cell_x_force;
   x[1] = Load_cell_y_force;
   x[2] = Load_cell_z_force;
-  t7 = 0.0F;
-  t20 = 1.17549435E-38F;
+  M0_idx_0 = 0.0F;
+  scale = 1.17549435E-38F;
   for (i = 0; i < 3; i++) {
-    t14 = (float)fabs(x[i]);
-    if (t14 > t20) {
-      t26 = t20 / t14;
-      t7 = 1.0F + t7 * t26 * t26;
-      t20 = t14;
+    M0_idx_2 = (float)fabs(x[i]);
+    if (M0_idx_2 > scale) {
+      Pow_Ankle = scale / M0_idx_2;
+      M0_idx_0 = 1.0F + M0_idx_0 * Pow_Ankle * Pow_Ankle;
+      scale = M0_idx_2;
     } else {
-      t26 = t14 / t20;
-      t7 += t26 * t26;
+      Pow_Ankle = M0_idx_2 / scale;
+      M0_idx_0 += Pow_Ankle * Pow_Ankle;
     }
   }
 
-  t7 = t20 * (float)sqrt(t7);
-  if (t7 > F_thresh) {
+  M0_idx_0 = scale * (float)sqrt(M0_idx_0);
+  if (M0_idx_0 > F_thresh) {
     ForceCount++;
     FootContact = (ForceCount > 2.0F);
   } else {
@@ -463,15 +338,171 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
   *StanceGain = 0.0F;
   *SwingGain = 0.0F;
 
-  /* Phase State management, set autodetection or command stance/swing */
-  f0 = rt_roundf_snf(Command_State);
-  if (f0 < 128.0F) {
-    if (f0 >= -128.0F) {
-      i0 = (signed char)f0;
+  /* Human Leg as a Robot states */
+  b_x[0] = Knee_joint_position;
+
+  /* MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION */
+  b_x[1] = Ankle_joint_position;
+  b_x[2] = knee_vel_prev;
+  b_x[3] = ankle_vel_prev;
+
+  /* Notes: */
+  /*  Knee axis treated as origin. */
+  /*  Orientation of knee and ankle rotation is biomechanical */
+  /* variables: */
+  /*  x - 4x1 array [knee pos, ankle pos, knee vel, ankle vel] */
+  /*  lt -thigh length  */
+  /*  ls -shank length */
+  /*  lfx, lfy - foot CoM x,y */
+  /*  lc - load cell y dist from ankle axis */
+  /*  la - ankle axis y dist to bottom of foot */
+  /*  COPfx - COP distance along foot from ankle axis projection, to be */
+  /*    computed from load cell */
+  /*  Ms - shank mass */
+  /*  Mf - foot mass */
+  /*  COPfx calc */
+  /* from pilot walking trials */
+  F[0] = Load_cell_x_force;
+  F[1] = Load_cell_y_force;
+  F[2] = Load_cell_z_force;
+  M0_idx_0 = (-0.0F * Load_cell_z_force - -0.0628F * Load_cell_y_force) +
+    Load_cell_x_moment;
+  scale = (-0.0628F * Load_cell_x_force - -0.0F * Load_cell_z_force) +
+    Load_cell_y_moment;
+  M0_idx_2 = (-0.0F * Load_cell_y_force - -0.0F * Load_cell_x_force) +
+    Load_cell_z_moment;
+  c[0] = 0.0F * M0_idx_2 - scale;
+  c[1] = M0_idx_0 - 0.0F * M0_idx_2;
+  c[2] = 0.0F * scale - 0.0F * M0_idx_0;
+  Pow_Ankle = 0.0F;
+  for (i = 0; i < 3; i++) {
+    Pow_Ankle += F[i] * (float)a[i];
+  }
+
+  for (i = 0; i < 3; i++) {
+    F[i] = c[i] / Pow_Ankle;
+  }
+
+  M0_idx_0 = c[0] / Pow_Ankle;
+  if (!FootContact) {
+    /* (-2,8) inches */
+    M0_idx_0 = -0.0508F;
+    COP_prev = -0.0508F;
+  } else {
+    /* only allow the COP to progress forwards */
+    if (F[0] < COP_prev) {
+      M0_idx_0 = COP_prev;
+    } else {
+      COP_prev = F[0];
+    }
+  }
+
+  /* Function to prevent the desired joint angles from changing to fast.  */
+  /* Works via saturation */
+  if (M0_idx_0 <= 0.06F) {
+    Pow_Ankle = M0_idx_0;
+  } else {
+    Pow_Ankle = 0.06F;
+  }
+
+  if (Pow_Ankle >= -0.0508F) {
+    *COPFX = Pow_Ankle;
+  } else {
+    *COPFX = -0.0508F;
+  }
+
+  /* meters */
+  /*      M = M_func(x,params); */
+  /*      C = C_func(x,params); */
+  /*      G = G_func(x,params);     */
+  /* L_FUNC */
+  /*     L = L_FUNC(IN1,IN2) */
+  /*     This function was generated by the Symbolic Math Toolbox version 8.5. */
+  /*     25-Aug-2020 13:50:39 */
+  M0_idx_0 = Knee_joint_position * 3.14159274F / 180.0F;
+  t6 = (Knee_joint_position + Ankle_joint_position) * 3.14159274F / 180.0F;
+  c_x = (float)cos(t6);
+  M0_idx_2 = (float)sin(t6);
+  Pow_Ankle = ((lt - *COPFX * M0_idx_2) + 0.0628F * c_x) + (0.3733F + -lt) *
+    (float)cos(M0_idx_0);
+  scale = (*COPFX * c_x + 0.0628F * M0_idx_2) + (0.3733F + -lt) * (float)sin
+    (M0_idx_0);
+  c_x = (float)sqrt(Pow_Ankle * Pow_Ankle + scale * scale);
+
+  /* J_L_FUNC */
+  /*     JACOBL = J_L_FUNC(IN1,IN2) */
+  /*     This function was generated by the Symbolic Math Toolbox version 8.5. */
+  /*     25-Aug-2020 13:50:39 */
+  M0_idx_0 = Knee_joint_position * 3.14159274F / 180.0F;
+  t6 = Ankle_joint_position * 3.14159274F / 180.0F;
+  scale = (Knee_joint_position + Ankle_joint_position) * 3.14159274F / 180.0F;
+  M0_idx_2 = (float)cos(scale);
+  Pow_Ankle = (float)sin(scale);
+  t12 = *COPFX * M0_idx_2;
+  t19 = (t12 + 0.0628F * Pow_Ankle) + (0.3733F + -lt) * (float)sin(M0_idx_0);
+  scale = ((lt + 0.0628F * M0_idx_2) + -(*COPFX * Pow_Ankle)) + (0.3733F + -lt) *
+    (float)cos(M0_idx_0);
+  scale = 1.0F / (float)sqrt(t19 * t19 + scale * scale);
+  J_L[0] = -lt * t19 * scale;
+  J_L[1] = -scale * ((0.0628F * (lt * Pow_Ankle + (0.3733F + -lt) * (float)sin
+    (t6)) + lt * t12) + *COPFX * (0.3733F + -lt) * (float)cos(t6));
+
+  /* J_dot_L = J_dot_L_func(x,params);     */
+  /*      Theta = Theta_func(x,params); */
+  /*      J_Theta = J_Theta_func(x,params); */
+  /*      J_dot_Theta = J_dot_Theta_func(x,params);    */
+  /*      J_z = [J_L;J_Theta]; */
+  /*      J_z_dot = [J_dot_L;J_dot_Theta];       */
+  /*      J_C = J_C_func(x,params);    */
+  *deltaL = c_x - L0;
+  M0_idx_0 = 0.0F;
+  for (i = 0; i < 2; i++) {
+    M0_idx_0 += J_L[i] * b_x[2 + i];
+  }
+
+  if (md < 10.0F) {
+    md = 10.0F;
+  } else {
+    if (md > 10000.0F) {
+      md = 10000.0F;
+    }
+  }
+
+  /* M_z = diag([md,md]); */
+  /* Calculate system energy */
+  Pow_Ankle = c_x - L0;
+
+  /* virtual spring potential energy */
+  /* virtual mass kinetic energy */
+  *Esys = 0.5F * k * (Pow_Ankle * Pow_Ankle) + 0.5F * md * (M0_idx_0 * M0_idx_0);
+
+  /* Phase Variable  */
+  /* s_a=clamp(1+(1-s_m)/(q_h_0-q_h_m)*(hip-q_h_0),0,1); */
+  Pow_Ankle = 0.4F * (IMU_pitch - -20.0F) / 43.0F;
+  if (0.6F + Pow_Ankle <= 1.0F) {
+    Pow_Ankle += 0.6F;
+  } else {
+    Pow_Ankle = 1.0F;
+  }
+
+  if (Pow_Ankle >= 0.6F) {
+    *phase_var_out = Pow_Ankle;
+  } else {
+    *phase_var_out = 0.6F;
+  }
+
+  /* IMU State check */
+  IMU_LIVE = ((float)fabs(hip_pos_prev - IMU_pitch) < 1.0F);
+
+  /*     %% Phase State management, set autodetection or command stance/swing */
+  scale = rt_roundf_snf(Command_State);
+  if (scale < 128.0F) {
+    if (scale >= -128.0F) {
+      i0 = (signed char)scale;
     } else {
       i0 = MIN_int8_T;
     }
-  } else if (f0 >= 128.0F) {
+  } else if (scale >= 128.0F) {
     i0 = MAX_int8_T;
   } else {
     i0 = 0;
@@ -506,9 +537,9 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
 
     /* Manage torque smoothing when switching phases */
     if (Stance) {
-      t7 = (time_in - t_switched_phase) / 0.24000001F;
-      if (t7 <= 1.0F) {
-        *StanceGain = t7;
+      scale = (time_in - t_switched_phase) / 0.24000001F;
+      if (scale <= 1.0F) {
+        *StanceGain = scale;
       } else {
         *StanceGain = 1.0F;
       }
@@ -516,9 +547,9 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
       *SwingGain = 1.0F - *StanceGain;
     } else {
       if (Swing) {
-        t7 = (time_in - t_switched_phase) / 0.24000001F;
-        if (t7 <= 1.0F) {
-          *SwingGain = t7;
+        scale = (time_in - t_switched_phase) / 0.24000001F;
+        if (scale <= 1.0F) {
+          *SwingGain = scale;
         } else {
           *SwingGain = 1.0F;
         }
@@ -527,14 +558,14 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
       }
     }
   } else {
-    f0 = rt_roundf_snf(Command_State);
-    if (f0 < 128.0F) {
-      if (f0 >= -128.0F) {
-        i0 = (signed char)f0;
+    scale = rt_roundf_snf(Command_State);
+    if (scale < 128.0F) {
+      if (scale >= -128.0F) {
+        i0 = (signed char)scale;
       } else {
         i0 = MIN_int8_T;
       }
-    } else if (f0 >= 128.0F) {
+    } else if (scale >= 128.0F) {
       i0 = MAX_int8_T;
     } else {
       i0 = 0;
@@ -546,14 +577,14 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
       Swing = false;
       *StanceGain = 1.0F;
     } else {
-      f0 = rt_roundf_snf(Command_State);
-      if (f0 < 128.0F) {
-        if (f0 >= -128.0F) {
-          i0 = (signed char)f0;
+      scale = rt_roundf_snf(Command_State);
+      if (scale < 128.0F) {
+        if (scale >= -128.0F) {
+          i0 = (signed char)scale;
         } else {
           i0 = MIN_int8_T;
         }
-      } else if (f0 >= 128.0F) {
+      } else if (scale >= 128.0F) {
         i0 = MAX_int8_T;
       } else {
         i0 = 0;
@@ -568,77 +599,51 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
     }
   }
 
-  /* Torque computation */
+  /*     %% Torque computation */
   if (SLIP_ON != 0.0F) {
     /*         %% Stance                 */
-    /* Virtual linear spring */
-    t24 = -k * *deltaL;
-    t19 = -d * t25;
-    for (i = 0; i < 5; i++) {
-      u_lin_spring[i] = t24 * J[i];
-      u_lin_damp[i] = t19 * J[i];
+    /* Virtual spring */
+    /* MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION */
+    Pow_Ankle = -k * *deltaL;
+    scale = -d * M0_idx_0;
+    for (i = 0; i < 2; i++) {
+      u_lin_spring[i] = Pow_Ankle * J_L[i];
+      u_lin_damp[i] = scale * J_L[i];
     }
 
-    *U_LIN_DAMP_K = -u_lin_damp[3];
-
-    /*  -u_G_shape(4); */
-    *U_LIN_DAMP_A = u_lin_damp[4];
-
-    /*  u_G_shape(5); */
-    *U_LIN_SPRING_K = -u_lin_spring[3];
-    *U_LIN_SPRING_A = u_lin_spring[4];
-    t19 = -u_lin_damp[3] + -u_lin_spring[3];
-
-    /* reverse knee sign convention of biomechanics versus biped modeling */
-    t27 = u_lin_damp[4] + u_lin_spring[4];
-
-    /* estimate how much energy the virtual linear damper is dissipating, to be added back in during pushoff */
-    /*          if ~PushOff */
-    /*              Edis = Edis  + (knee_vel*u_lin_damp(4) + ankle_vel*u_lin_damp(5))*dt; */
-    /*          end */
+    *U_LIN_DAMP_A = u_lin_damp[1];
+    t12 = u_lin_damp[0] + u_lin_spring[0];
+    t19 = u_lin_damp[1] + u_lin_spring[1];
     if (KPBC_ON != 0.0F) {
       /* Also use energy tracking controller    */
-      /*              if Joint_Bio_Sat  */
-      /*                  %Joint level KPBC */
-      /*                  u_pbc(4) = -pbc_gain_knee * knee_vel * (Esys_integrate - Eref - max(Edis,Edismax)); */
-      /*                  u_pbc(5) = -pbc_gain_ankle * ankle_vel * (Esys_integrate - Eref - max(Edis,Edismax)); */
-      /*                   */
-      /*                  U_PBC_K = u_pbc(4); %THE SIGN NEEDS TO BE CHANGED IF USING SPRING VERSUS JOINT LEVEL BECAUSE OF BIO VS ROBOT KNEE CORDS */
-      /*                  U_PBC_A = u_pbc(5); */
-      /*                   */
-      /*              else */
-      /* KPBC along spring axis */
-      t24 = *Esys - Eref;
-      for (i = 0; i < 5; i++) {
-        J[i] = -J[i] * pbc_gain_knee * t24 * t25;
+      Pow_Ankle = pbc_gain_knee * (*Esys - Eref) * M0_idx_0;
+      for (i = 0; i < 2; i++) {
+        J_L[i] *= Pow_Ankle;
       }
 
-      *U_PBC_K = -J[3];
+      /* MAKE SURE TO MANAGE BIOMECHANICS VS RIGHT-HAND-RULE AXIS ORIENTATION */
+      *U_PBC_K = J_L[0];
+      *U_PBC_A = J_L[1];
 
-      /* THE SIGN NEEDS TO BE CHANGED IF USING SPRING VERSUS JOINT LEVEL BECAUSE OF BIO VS ROBOT KNEE CORDS */
-      *U_PBC_A = J[4];
-
-      /* end */
-      /* moving average filter and saturation laws on value and rate of */
-      /* torque */
+      /* Moving average filter and saturation laws on value and rate of torque        */
       /* Absolute saturation */
       if (KPBC_max_torque > 0.0F) {
         /* Function to prevent the desired joint angles from changing to fast.  */
         /* Works via saturation */
         if (-KPBC_max_torque >= KPBC_max_torque) {
-          t14 = -KPBC_max_torque;
+          M0_idx_2 = -KPBC_max_torque;
         } else {
-          t14 = KPBC_max_torque;
+          M0_idx_2 = KPBC_max_torque;
         }
 
-        if (-J[3] <= t14) {
-          t26 = -J[3];
+        if (J_L[0] <= M0_idx_2) {
+          Pow_Ankle = J_L[0];
         } else {
-          t26 = t14;
+          Pow_Ankle = M0_idx_2;
         }
 
-        if (t26 >= -KPBC_max_torque) {
-          *U_PBC_K = t26;
+        if (Pow_Ankle >= -KPBC_max_torque) {
+          *U_PBC_K = Pow_Ankle;
         } else {
           *U_PBC_K = -KPBC_max_torque;
         }
@@ -646,19 +651,19 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
         /* Function to prevent the desired joint angles from changing to fast.  */
         /* Works via saturation */
         if (-KPBC_max_torque >= KPBC_max_torque) {
-          t14 = -KPBC_max_torque;
+          M0_idx_2 = -KPBC_max_torque;
         } else {
-          t14 = KPBC_max_torque;
+          M0_idx_2 = KPBC_max_torque;
         }
 
-        if (J[4] <= t14) {
-          t26 = J[4];
+        if (J_L[1] <= M0_idx_2) {
+          Pow_Ankle = J_L[1];
         } else {
-          t26 = t14;
+          Pow_Ankle = M0_idx_2;
         }
 
-        if (t26 >= -KPBC_max_torque) {
-          *U_PBC_A = t26;
+        if (Pow_Ankle >= -KPBC_max_torque) {
+          *U_PBC_A = Pow_Ankle;
         } else {
           *U_PBC_A = -KPBC_max_torque;
         }
@@ -666,135 +671,133 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
 
       /* Rate saturation */
       if (KPBC_max_torque_rate > 0.0F) {
-        t7 = (*U_PBC_K - u_pbc_knee_prev) / dt;
-        t20 = (*U_PBC_A - u_pbc_ankle_prev) / dt;
+        scale = (*U_PBC_K - u_pbc_knee_prev) / dt;
+        M0_idx_0 = (*U_PBC_A - u_pbc_ankle_prev) / dt;
 
         /* Function to prevent the desired joint angles from changing to fast.  */
         /* Works via saturation */
         if (-KPBC_max_torque_rate >= KPBC_max_torque_rate) {
-          t14 = -KPBC_max_torque_rate;
+          M0_idx_2 = -KPBC_max_torque_rate;
         } else {
-          t14 = KPBC_max_torque_rate;
+          M0_idx_2 = KPBC_max_torque_rate;
         }
 
-        if (t7 <= t14) {
-          t26 = t7;
+        if (scale <= M0_idx_2) {
+          Pow_Ankle = scale;
         } else {
-          t26 = t14;
+          Pow_Ankle = M0_idx_2;
         }
 
         /* Function to prevent the desired joint angles from changing to fast.  */
         /* Works via saturation */
         if (-KPBC_max_torque_rate >= KPBC_max_torque_rate) {
-          t14 = -KPBC_max_torque_rate;
+          M0_idx_2 = -KPBC_max_torque_rate;
         } else {
-          t14 = KPBC_max_torque_rate;
+          M0_idx_2 = KPBC_max_torque_rate;
         }
 
-        if (t20 <= t14) {
-          t7 = t20;
+        if (M0_idx_0 <= M0_idx_2) {
+          scale = M0_idx_0;
         } else {
-          t7 = t14;
+          scale = M0_idx_2;
         }
 
-        if (t26 >= -KPBC_max_torque_rate) {
-          b_t26 = t26;
+        if (Pow_Ankle >= -KPBC_max_torque_rate) {
+          c_Pow_Ankle = Pow_Ankle;
         } else {
-          b_t26 = -KPBC_max_torque_rate;
+          c_Pow_Ankle = -KPBC_max_torque_rate;
         }
 
-        *U_PBC_K = b_t26 * dt + u_pbc_knee_prev;
-        if (t7 >= -KPBC_max_torque_rate) {
-          c_t7 = t7;
+        *U_PBC_K = c_Pow_Ankle * dt + u_pbc_knee_prev;
+        if (scale >= -KPBC_max_torque_rate) {
+          c_scale = scale;
         } else {
-          c_t7 = -KPBC_max_torque_rate;
+          c_scale = -KPBC_max_torque_rate;
         }
 
-        *U_PBC_A = c_t7 * dt + u_pbc_ankle_prev;
+        *U_PBC_A = c_scale * dt + u_pbc_ankle_prev;
       }
 
-      /* exponential smoothing of torque */
+      /* Exponential smoothing of torque */
       *U_PBC_K = (1.0F - KPBC_filter_coeff) * u_pbc_knee_prev +
         KPBC_filter_coeff * *U_PBC_K;
       *U_PBC_A = (1.0F - KPBC_filter_coeff) * u_pbc_ankle_prev +
         KPBC_filter_coeff * *U_PBC_A;
+
+      /* Biomemetic power saturation */
       if (Joint_Bio_Sat != 0.0F) {
-        /* Biomemetic power saturation */
-        t7 = knee_vel_prev * *U_PBC_K;
-        t20 = ankle_vel_prev * *U_PBC_A;
-        if (t20 < 0.0F) {
-          b_t20 = -1.0F;
-        } else if (t20 > 0.0F) {
-          b_t20 = 1.0F;
-        } else if (t20 == 0.0F) {
-          b_t20 = 0.0F;
+        scale = knee_vel_prev * *U_PBC_K;
+        Pow_Ankle = ankle_vel_prev * *U_PBC_A;
+        if (Pow_Ankle < 0.0F) {
+          b_Pow_Ankle = -1.0F;
+        } else if (Pow_Ankle > 0.0F) {
+          b_Pow_Ankle = 1.0F;
+        } else if (Pow_Ankle == 0.0F) {
+          b_Pow_Ankle = 0.0F;
         } else {
-          b_t20 = t20;
+          b_Pow_Ankle = Pow_Ankle;
         }
 
-        if (b_t20 == -1.0F) {
+        if (b_Pow_Ankle == -1.0F) {
           *U_PBC_A = 0.0F;
         }
 
-        if (t7 < 0.0F) {
-          b_t7 = -1.0F;
-        } else if (t7 > 0.0F) {
-          b_t7 = 1.0F;
-        } else if (t7 == 0.0F) {
-          b_t7 = 0.0F;
+        if (scale < 0.0F) {
+          b_scale = -1.0F;
+        } else if (scale > 0.0F) {
+          b_scale = 1.0F;
+        } else if (scale == 0.0F) {
+          b_scale = 0.0F;
         } else {
-          b_t7 = t7;
+          b_scale = scale;
         }
 
-        if (b_t7 == 1.0F) {
+        if (b_scale == 1.0F) {
           *U_PBC_K = 0.0F;
         }
       }
 
-      /* Use energy intergration scheme   */
-      /* Esys_integrate = Esys_integrate  + (knee_vel*U_PBC_K + ankle_vel*U_PBC_A)*dt; */
-      /* cancel damping term during KPBC */
-      t19 = (t19 + *U_PBC_K) - (-u_lin_damp[3]);
-      t27 = (t27 + *U_PBC_A) - u_lin_damp[4];
+      t12 = (t12 + *U_PBC_K) - u_lin_damp[0];
+      t19 = (t19 + *U_PBC_A) - u_lin_damp[1];
     }
 
     /*         %% Swing */
     if (IMU_LIVE) {
       /* Use hip pos as phase variable to index winters data */
-      t24 = *phase_var_out * 1000.0F;
+      Pow_Ankle = *phase_var_out * 1000.0F;
       trueCount = 0;
       for (i = 0; i < 8; i++) {
-        if (t24 - (float)knee_ind[i] >= 0.0F) {
+        if (Pow_Ankle - (float)knee_ind[i] >= 0.0F) {
           trueCount++;
         }
       }
 
-      t7 = (t24 - (float)iv0[(int)(float)trueCount - 1]) / (float)(iv0[(int)
-        ((float)trueCount + 1.0F) - 1] - iv0[(int)(float)trueCount - 1]);
-      *knee_des_out = ((a_knee[(int)(float)trueCount - 1] * ((t7 - 1.0F) * (t7 -
-        1.0F)) + a_knee[(int)(float)trueCount + 6] * rt_powf_snf(t7 - 1.0F, 6.0F))
-                       + a_knee[(int)(float)trueCount + 20] * (t7 - 1.0F)) +
-        a_knee[(int)(float)trueCount + 13];
+      c_x = (Pow_Ankle - (float)iv0[(int)(float)trueCount - 1]) / (float)(iv0
+        [(int)((float)trueCount + 1.0F) - 1] - iv0[(int)(float)trueCount - 1]);
+      *knee_des_out = ((a_knee[(int)(float)trueCount - 1] * ((c_x - 1.0F) * (c_x
+        - 1.0F)) + a_knee[(int)(float)trueCount + 6] * rt_powf_snf(c_x - 1.0F,
+        6.0F)) + a_knee[(int)(float)trueCount + 20] * (c_x - 1.0F)) + a_knee
+        [(int)(float)trueCount + 13];
       trueCount = 0;
       for (i = 0; i < 11; i++) {
-        if (t24 - (float)ankle_ind[i] >= 0.0F) {
+        if (Pow_Ankle - (float)ankle_ind[i] >= 0.0F) {
           trueCount++;
         }
       }
 
-      t7 = (t24 - (float)iv1[(int)(float)trueCount - 1]) / (float)(iv1[(int)
-        ((float)trueCount + 1.0F) - 1] - iv1[(int)(float)trueCount - 1]);
-      *ankle_des_out = ((a_ankle[(int)(float)trueCount - 1] * ((t7 - 1.0F) * (t7
-        - 1.0F)) + a_ankle[(int)(float)trueCount + 9] * rt_powf_snf(t7 - 1.0F,
-        6.0F)) + a_ankle[(int)(float)trueCount + 29] * (t7 - 1.0F)) + a_ankle
-        [(int)(float)trueCount + 19];
+      c_x = (Pow_Ankle - (float)iv1[(int)(float)trueCount - 1]) / (float)(iv1
+        [(int)((float)trueCount + 1.0F) - 1] - iv1[(int)(float)trueCount - 1]);
+      *ankle_des_out = ((a_ankle[(int)(float)trueCount - 1] * ((c_x - 1.0F) *
+        (c_x - 1.0F)) + a_ankle[(int)(float)trueCount + 9] * rt_powf_snf(c_x -
+        1.0F, 6.0F)) + a_ankle[(int)(float)trueCount + 29] * (c_x - 1.0F)) +
+        a_ankle[(int)(float)trueCount + 19];
 
       /* follow the trjactory via PD controller */
       /* This control basically assumes that the desired joint angles are static i.e., the desired velocities are all zero. */
       /*  Helper functions */
-      t7 = kp_knee * (*knee_des_out - Knee_joint_position) + kd_knee *
+      scale = kp_knee * (*knee_des_out - Knee_joint_position) + kd_knee *
         -knee_vel_prev;
-      t20 = kp_ankle * (*ankle_des_out - Ankle_joint_position) + kd_ankle *
+      M0_idx_0 = kp_ankle * (*ankle_des_out - Ankle_joint_position) + kd_ankle *
         -ankle_vel_prev;
     } else {
       *knee_des_out = Knee_joint_position;
@@ -802,15 +805,15 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
 
       /* This control basically assumes that the desired joint angles are static i.e., the desired velocities are all zero. */
       /*  Helper functions */
-      t7 = kp_knee * (Knee_joint_position - Knee_joint_position) + kd_knee *
+      scale = kp_knee * (Knee_joint_position - Knee_joint_position) + kd_knee *
         -knee_vel_prev;
-      t20 = kp_ankle * (Ankle_joint_position - Ankle_joint_position) + kd_ankle *
-        -ankle_vel_prev;
+      M0_idx_0 = kp_ankle * (Ankle_joint_position - Ankle_joint_position) +
+        kd_ankle * -ankle_vel_prev;
     }
 
     /* Smooth between stance and swing torques */
-    *Knee_torque_command = *StanceGain * t19 + *SwingGain * t7;
-    *Ankle_torque_command = *StanceGain * t27 + *SwingGain * t20;
+    *Knee_torque_command = *StanceGain * t12 + *SwingGain * scale;
+    *Ankle_torque_command = *StanceGain * t19 + *SwingGain * M0_idx_0;
   } else {
     IMU_LIVE = true;
 
@@ -826,14 +829,89 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
       kd_ankle * -ankle_vel_prev;
   }
 
+  /*     %% Friction Compensation */
+  /* v0 = 0.01; */
+  if (Fric_Comp != 0.0F) {
+    if (knee_vel_prev < 0.0F) {
+      scale = 0.0F;
+    } else if (knee_vel_prev < v0) {
+      scale = knee_vel_prev / v0;
+    } else {
+      scale = 1.0F;
+    }
+
+    if (knee_vel_prev < -v0) {
+      M0_idx_0 = 0.0F;
+    } else if (knee_vel_prev < 0.0F) {
+      M0_idx_0 = (knee_vel_prev - (-v0)) / (0.0F - (-v0));
+    } else {
+      M0_idx_0 = 1.0F;
+    }
+
+    if (*Knee_torque_command < 0.0F) {
+      b_Knee_torque_command = 0.0F;
+    } else if (*Knee_torque_command < 5.0F) {
+      b_Knee_torque_command = *Knee_torque_command / 5.0F;
+    } else {
+      b_Knee_torque_command = 1.0F;
+    }
+
+    if (*Knee_torque_command < -5.0F) {
+      c_Knee_torque_command = 0.0F;
+    } else if (*Knee_torque_command < 0.0F) {
+      c_Knee_torque_command = (*Knee_torque_command - -5.0F) / 5.0F;
+    } else {
+      c_Knee_torque_command = 1.0F;
+    }
+
+    *Knee_torque_command += (scale * 0.8F + (1.0F - M0_idx_0) * -1.7F) + (1.0F -
+      scale) * M0_idx_0 * (b_Knee_torque_command * 1.6F + (1.0F -
+      c_Knee_torque_command) * -2.8F);
+    if (ankle_vel_prev < 0.0F) {
+      scale = 0.0F;
+    } else if (ankle_vel_prev < v0) {
+      scale = ankle_vel_prev / v0;
+    } else {
+      scale = 1.0F;
+    }
+
+    if (ankle_vel_prev < -v0) {
+      M0_idx_0 = 0.0F;
+    } else if (ankle_vel_prev < 0.0F) {
+      M0_idx_0 = (ankle_vel_prev - (-v0)) / (0.0F - (-v0));
+    } else {
+      M0_idx_0 = 1.0F;
+    }
+
+    if (*Ankle_torque_command < 0.0F) {
+      b_Ankle_torque_command = 0.0F;
+    } else if (*Ankle_torque_command < 5.0F) {
+      b_Ankle_torque_command = *Ankle_torque_command / 5.0F;
+    } else {
+      b_Ankle_torque_command = 1.0F;
+    }
+
+    if (*Ankle_torque_command < -5.0F) {
+      c_Ankle_torque_command = 0.0F;
+    } else if (*Ankle_torque_command < 0.0F) {
+      c_Ankle_torque_command = (*Ankle_torque_command - -5.0F) / 5.0F;
+    } else {
+      c_Ankle_torque_command = 1.0F;
+    }
+
+    *Ankle_torque_command += (scale * 0.8F + (1.0F - M0_idx_0) * -1.7F) + (1.0F
+      - scale) * M0_idx_0 * (b_Ankle_torque_command * 1.6F + (1.0F -
+      c_Ankle_torque_command) * -2.8F);
+  }
+
   /*     %% Virtual hard stops */
   for (i = 0; i < 2; i++) {
-    u_stop[i] = 0.0F;
+    u_lin_spring[i] = 0.0F;
   }
 
   if ((knee_stop_low < knee_stop_high) && (ankle_stop_low < ankle_stop_high)) {
-    knee_limits[0] = knee_stop_low;
-    knee_limits[1] = knee_stop_high;
+    J_L[0] = knee_stop_low;
+    J_L[1] = knee_stop_high;
 
     /* deg, need to make sure its ordered */
     ankle_limits[0] = ankle_stop_low;
@@ -841,54 +919,54 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
   } else {
     /* deg, need to make sure its ordered */
     for (i = 0; i < 2; i++) {
-      knee_limits[i] = 2.0F + 103.0F * (float)i;
+      J_L[i] = 2.0F + 103.0F * (float)i;
       ankle_limits[i] = -35.0F + 70.0F * (float)i;
     }
   }
 
-  if (Knee_joint_position < knee_limits[0]) {
-    u_stop[0] = -kp_knee * (Knee_joint_position - knee_limits[0]) - kd_knee *
+  if (Knee_joint_position < J_L[0]) {
+    u_lin_spring[0] = -kp_knee * (Knee_joint_position - J_L[0]) - kd_knee *
       knee_vel_prev;
   }
 
-  if (knee_limits[1] < Knee_joint_position) {
-    u_stop[0] = -kp_knee * (Knee_joint_position - knee_limits[1]) - kd_knee *
+  if (J_L[1] < Knee_joint_position) {
+    u_lin_spring[0] = -kp_knee * (Knee_joint_position - J_L[1]) - kd_knee *
       knee_vel_prev;
   }
 
   if (Ankle_joint_position < ankle_limits[0]) {
-    u_stop[1] = -kp_ankle * (Ankle_joint_position - ankle_limits[0]) - kd_ankle *
-      ankle_vel_prev;
+    u_lin_spring[1] = -kp_ankle * (Ankle_joint_position - ankle_limits[0]) -
+      kd_ankle * ankle_vel_prev;
   }
 
   if (ankle_limits[1] < Ankle_joint_position) {
-    u_stop[1] = -kp_ankle * (Ankle_joint_position - ankle_limits[1]) - kd_ankle *
-      ankle_vel_prev;
+    u_lin_spring[1] = -kp_ankle * (Ankle_joint_position - ankle_limits[1]) -
+      kd_ankle * ankle_vel_prev;
   }
 
-  *U_STOP_K = u_stop[0];
-  *U_STOP_A = u_stop[1];
-  *Knee_torque_command += u_stop[0];
-  *Ankle_torque_command += u_stop[1];
+  *U_STOP_K = u_lin_spring[0];
+  *U_STOP_A = u_lin_spring[1];
+  *Knee_torque_command += u_lin_spring[0];
+  *Ankle_torque_command += u_lin_spring[1];
 
   /*     %% Saturate torque output */
   if (max_torque > 0.0F) {
     /* Function to prevent the desired joint angles from changing to fast.  */
     /* Works via saturation */
     if (-max_torque >= max_torque) {
-      t14 = -max_torque;
+      M0_idx_2 = -max_torque;
     } else {
-      t14 = max_torque;
+      M0_idx_2 = max_torque;
     }
 
-    if (*Knee_torque_command <= t14) {
-      t26 = *Knee_torque_command;
+    if (*Knee_torque_command <= M0_idx_2) {
+      Pow_Ankle = *Knee_torque_command;
     } else {
-      t26 = t14;
+      Pow_Ankle = M0_idx_2;
     }
 
-    if (t26 >= -max_torque) {
-      *Knee_torque_command = t26;
+    if (Pow_Ankle >= -max_torque) {
+      *Knee_torque_command = Pow_Ankle;
     } else {
       *Knee_torque_command = -max_torque;
     }
@@ -896,19 +974,19 @@ void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
     /* Function to prevent the desired joint angles from changing to fast.  */
     /* Works via saturation */
     if (-max_torque >= max_torque) {
-      t14 = -max_torque;
+      M0_idx_2 = -max_torque;
     } else {
-      t14 = max_torque;
+      M0_idx_2 = max_torque;
     }
 
-    if (*Ankle_torque_command <= t14) {
-      t26 = *Ankle_torque_command;
+    if (*Ankle_torque_command <= M0_idx_2) {
+      Pow_Ankle = *Ankle_torque_command;
     } else {
-      t26 = t14;
+      Pow_Ankle = M0_idx_2;
     }
 
-    if (t26 >= -max_torque) {
-      *Ankle_torque_command = t26;
+    if (Pow_Ankle >= -max_torque) {
+      *Ankle_torque_command = Pow_Ankle;
     } else {
       *Ankle_torque_command = -max_torque;
     }
@@ -947,6 +1025,7 @@ void SLIP_KPBC_init(void)
   Stance = true;
   Swing = false;
   ForceCount = 0.0F;
+  COP_prev = -0.0508F;
 }
 
 /*

@@ -2,7 +2,7 @@
 ## Makefile generated for MATLAB file/project 'SLIP_KPBC'. 
 ## 
 ## Makefile     : SLIP_KPBC_rtw.mk
-## Generated on : Mon Feb 03 14:52:22 2020
+## Generated on : Tue Aug 25 14:09:04 2020
 ## MATLAB Coder version: 3.2 (R2016b)
 ## 
 ## Build Info:
@@ -31,7 +31,7 @@ MATLAB_ROOT               = C:\PROGRA~1\MATLAB\R2016b
 MATLAB_BIN                = C:\PROGRA~1\MATLAB\R2016b\bin
 MATLAB_ARCH_BIN           = C:\PROGRA~1\MATLAB\R2016b\bin\win64
 MASTER_ANCHOR_DIR         = 
-START_DIR                 = \\engstor\locolab\MEMBE~G1\MAR~5G55\Codes\Matlab\LEG~N7YZ
+START_DIR                 = C:\Users\MXY110~1\GITREP~1\LEG2-I~1
 ARCH                      = win64
 RELATIVE_PATH_TO_ANCHOR   = .
 PERL                      = $(MATLAB_ROOT)\sys\perl\win32\bin\perl.exe
@@ -200,7 +200,7 @@ DEFINES = $(DEFINES_STANDARD)
 ## SOURCE FILES
 ###########################################################################
 
-SRCS = $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC_rtwutil.c $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC_initialize.c $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC_terminate.c $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC.c $(START_DIR)\codegen\lib\SLIP_KPBC\cosd.c $(START_DIR)\codegen\lib\SLIP_KPBC\sind.c $(START_DIR)\codegen\lib\SLIP_KPBC\rt_nonfinite.c $(START_DIR)\codegen\lib\SLIP_KPBC\rtGetNaN.c $(START_DIR)\codegen\lib\SLIP_KPBC\rtGetInf.c
+SRCS = $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC_initialize.c $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC_terminate.c $(START_DIR)\codegen\lib\SLIP_KPBC\SLIP_KPBC.c $(START_DIR)\codegen\lib\SLIP_KPBC\rt_nonfinite.c $(START_DIR)\codegen\lib\SLIP_KPBC\rtGetNaN.c $(START_DIR)\codegen\lib\SLIP_KPBC\rtGetInf.c
 
 ALL_SRCS = $(SRCS)
 
@@ -208,7 +208,7 @@ ALL_SRCS = $(SRCS)
 ## OBJECTS
 ###########################################################################
 
-OBJS = SLIP_KPBC_rtwutil.obj SLIP_KPBC_initialize.obj SLIP_KPBC_terminate.obj SLIP_KPBC.obj cosd.obj sind.obj rt_nonfinite.obj rtGetNaN.obj rtGetInf.obj
+OBJS = SLIP_KPBC_initialize.obj SLIP_KPBC_terminate.obj SLIP_KPBC.obj rt_nonfinite.obj rtGetNaN.obj rtGetInf.obj
 
 ALL_OBJS = $(OBJS)
 

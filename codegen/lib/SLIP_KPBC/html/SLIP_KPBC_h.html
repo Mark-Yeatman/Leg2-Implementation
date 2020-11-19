@@ -17,57 +17,56 @@
 <a name="5"><font color="#888888 "><i>    5   </i></font></a><font color="#117755"><I> * File: SLIP_KPBC.h</i></font>
 <a name="6"><font color="#888888 "><i>    6   </i></font></a><font color="#117755"><I> *</i></font>
 <a name="7"><font color="#888888 "><i>    7   </i></font></a><font color="#117755"><I> * MATLAB Coder version            : 3.2</i></font>
-<a name="8"><font color="#888888 "><i>    8   </i></font></a><font color="#117755"><I> * C/C++ source code generated on  : 01-Jul-2020 11:22:48</i></font>
+<a name="8"><font color="#888888 "><i>    8   </i></font></a><font color="#117755"><I> * C/C++ source code generated on  : 31-Aug-2020 12:07:22</i></font>
 <a name="9"><font color="#888888 "><i>    9   </i></font></a><font color="#117755"><I> */</i></font>
 <a name="10"><font color="#888888 "><i>   10   </i></font></a>
 <a name="11"><font color="#888888 "><i>   11   </i></font></a><font color="#992211">#</font><font color="#992211"><b>ifndef</b></font> SLIP_KPBC_H
 <a name="12"><font color="#888888 "><i>   12   </i></font></a><font color="#992211">#</font><font color="#992211"><b>define</b></font> SLIP_KPBC_H
 <a name="13"><font color="#888888 "><i>   13   </i></font></a>
 <a name="14"><font color="#888888 "><i>   14   </i></font></a><font color="#117755"><i>/* Include Files */</i></font>
-<a name="15"><font color="#888888 "><i>   15   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;float.h&gt;</font>
-<a name="16"><font color="#888888 "><i>   16   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;math.h&gt;</font>
-<a name="17"><font color="#888888 "><i>   17   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;stddef.h&gt;</font>
-<a name="18"><font color="#888888 "><i>   18   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;stdlib.h&gt;</font>
-<a name="19"><font color="#888888 "><i>   19   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;rt_nonfinite.h&quot;</font>
-<a name="20"><font color="#888888 "><i>   20   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;rtwtypes.h&quot;</font>
-<a name="21"><font color="#888888 "><i>   21   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;SLIP_KPBC_types.h&quot;</font>
-<a name="22"><font color="#888888 "><i>   22   </i></font></a>
-<a name="23"><font color="#888888 "><i>   23   </i></font></a><font color="#117755"><i>/* Function Declarations */</i></font>
-<a name="24"><font color="#888888 "><i>   24   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_SLIP_KPBC" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_SLIP_KPBC');" target="_self"><font color="#1122aa">SLIP_KPBC</font></a>(<font color="#112266"><b>float</b></font> IMU_pitch, <font color="#112266"><b>float</b></font> Knee_joint_position, <font color="#112266"><b>float</b></font>
-<a name="25"><font color="#888888 "><i>   25   </i></font></a>                      Ankle_joint_position, <font color="#112266"><b>float</b></font> time_in, <font color="#112266"><b>float</b></font> dt, <font color="#112266"><b>float</b></font>
-<a name="26"><font color="#888888 "><i>   26   </i></font></a>                      Load_cell_x_force, <font color="#112266"><b>float</b></font> Load_cell_y_force, <font color="#112266"><b>float</b></font>
-<a name="27"><font color="#888888 "><i>   27   </i></font></a>                      Load_cell_z_force, <font color="#112266"><b>float</b></font> Load_cell_x_moment, <font color="#112266"><b>float</b></font>
-<a name="28"><font color="#888888 "><i>   28   </i></font></a>                      Load_cell_y_moment, <font color="#112266"><b>float</b></font> Load_cell_z_moment, <font color="#112266"><b>float</b></font>
-<a name="29"><font color="#888888 "><i>   29   </i></font></a>                      kp_knee, <font color="#112266"><b>float</b></font> kd_knee, <font color="#112266"><b>float</b></font> kp_ankle, <font color="#112266"><b>float</b></font> kd_ankle,
-<a name="30"><font color="#888888 "><i>   30   </i></font></a>                      <font color="#112266"><b>float</b></font> ankle_des_in, <font color="#112266"><b>float</b></font> knee_des_in, <font color="#112266"><b>float</b></font>
-<a name="31"><font color="#888888 "><i>   31   </i></font></a>                      vel_filter_coeff, <font color="#112266"><b>float</b></font> KPBC_filter_coeff, <font color="#112266"><b>float</b></font> SLIP_ON,
-<a name="32"><font color="#888888 "><i>   32   </i></font></a>                      <font color="#112266"><b>float</b></font> lt, <font color="#112266"><b>float</b></font> k, <font color="#112266"><b>float</b></font> d, <font color="#112266"><b>float</b></font> L0, <font color="#112266"><b>float</b></font> KPBC_ON, <font color="#112266"><b>float</b></font>
-<a name="33"><font color="#888888 "><i>   33   </i></font></a>                      KPBC_max_torque_rate, <font color="#112266"><b>float</b></font> pbc_gain_knee, <font color="#112266"><b>float</b></font> M, <font color="#112266"><b>float</b></font>
-<a name="34"><font color="#888888 "><i>   34   </i></font></a>                      Eref, <font color="#112266"><b>float</b></font> knee_stop_low, <font color="#112266"><b>float</b></font> knee_stop_high, <font color="#112266"><b>float</b></font>
-<a name="35"><font color="#888888 "><i>   35   </i></font></a>                      ankle_stop_low, <font color="#112266"><b>float</b></font> ankle_stop_high, <font color="#112266"><b>float</b></font> max_torque,
-<a name="36"><font color="#888888 "><i>   36   </i></font></a>                      <font color="#112266"><b>float</b></font> k_tilde, <font color="#112266"><b>float</b></font> Ignore_PushOff, <font color="#112266"><b>float</b></font> F_thresh, <font color="#112266"><b>float</b></font>
-<a name="37"><font color="#888888 "><i>   37   </i></font></a>                      Command_State, <font color="#112266"><b>float</b></font> KPBC_max_torque, <font color="#112266"><b>float</b></font> Joint_Bio_Sat,
-<a name="38"><font color="#888888 "><i>   38   </i></font></a>                      <font color="#112266"><b>float</b></font> *Knee_torque_command, <font color="#112266"><b>float</b></font> *Ankle_torque_command,
-<a name="39"><font color="#888888 "><i>   39   </i></font></a>                      <font color="#112266"><b>float</b></font> *deltaL, <font color="#112266"><b>float</b></font> *hip_pos, <font color="#112266"><b>float</b></font> *Esys, <font color="#112266"><b>float</b></font>
-<a name="40"><font color="#888888 "><i>   40   </i></font></a>                      *Esys_integrate_out, <font color="#112266"><b>float</b></font> *U_LIN_SPRING_K, <font color="#112266"><b>float</b></font>
-<a name="41"><font color="#888888 "><i>   41   </i></font></a>                      *U_LIN_SPRING_A, <font color="#112266"><b>float</b></font> *U_LIN_DAMP_K, <font color="#112266"><b>float</b></font> *U_LIN_DAMP_A,
-<a name="42"><font color="#888888 "><i>   42   </i></font></a>                      <font color="#112266"><b>float</b></font> *U_STOP_K, <font color="#112266"><b>float</b></font> *U_STOP_A, <font color="#112266"><b>float</b></font> *U_PBC_K, <font color="#112266"><b>float</b></font>
-<a name="43"><font color="#888888 "><i>   43   </i></font></a>                      *U_PBC_A, <font color="#112266"><b>float</b></font> *knee_des_out, <font color="#112266"><b>float</b></font> *ankle_des_out, <font color="#112266"><b>float</b></font>
-<a name="44"><font color="#888888 "><i>   44   </i></font></a>                      *foot_contact, <font color="#112266"><b>float</b></font> *stance, <font color="#112266"><b>float</b></font> *swing, <font color="#112266"><b>float</b></font>
-<a name="45"><font color="#888888 "><i>   45   </i></font></a>                      *phase_var_out, <font color="#112266"><b>float</b></font> *IMU_LIVE_OUT, <font color="#112266"><b>float</b></font> *StanceGain,
-<a name="46"><font color="#888888 "><i>   46   </i></font></a>                      <font color="#112266"><b>float</b></font> *SwingGain, <font color="#112266"><b>float</b></font> *knee_joint_vel, <font color="#112266"><b>float</b></font>
-<a name="47"><font color="#888888 "><i>   47   </i></font></a>                      *ankle_joint_vel, <font color="#112266"><b>float</b></font> *hip_vel, <font color="#112266"><b>float</b></font> *PushOffOut);
-<a name="48"><font color="#888888 "><i>   48   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_SLIP_KPBC_init" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_SLIP_KPBC_init');" target="_self"><font color="#1122aa">SLIP_KPBC_init</font></a>(<font color="#112266"><b>void</b></font>);
-<a name="49"><font color="#888888 "><i>   49   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_knee_pos_prev_not_empty_init" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_knee_pos_prev_not_empty_init');" target="_self"><font color="#1122aa">knee_pos_prev_not_empty_init</font></a>(<font color="#112266"><b>void</b></font>);
-<a name="50"><font color="#888888 "><i>   50   </i></font></a>
-<a name="51"><font color="#888888 "><i>   51   </i></font></a><font color="#992211">#</font><font color="#992211"><b>endif</b></font>
-<a name="52"><font color="#888888 "><i>   52   </i></font></a>
-<a name="53"><font color="#888888 "><i>   53   </i></font></a><font color="#117755"><i>/*</i></font>
-<a name="54"><font color="#888888 "><i>   54   </i></font></a><font color="#117755"><I> * File trailer for SLIP_KPBC.h</i></font>
-<a name="55"><font color="#888888 "><i>   55   </i></font></a><font color="#117755"><I> *</i></font>
-<a name="56"><font color="#888888 "><i>   56   </i></font></a><font color="#117755"><I> * [EOF]</i></font>
-<a name="57"><font color="#888888 "><i>   57   </i></font></a><font color="#117755"><I> */</i></font>
-<a name="58"><font color="#888888 "><i>   58   </i></font></a></pre>
+<a name="15"><font color="#888888 "><i>   15   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;math.h&gt;</font>
+<a name="16"><font color="#888888 "><i>   16   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;stddef.h&gt;</font>
+<a name="17"><font color="#888888 "><i>   17   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&lt;stdlib.h&gt;</font>
+<a name="18"><font color="#888888 "><i>   18   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;rt_nonfinite.h&quot;</font>
+<a name="19"><font color="#888888 "><i>   19   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;rtwtypes.h&quot;</font>
+<a name="20"><font color="#888888 "><i>   20   </i></font></a><font color="#992211">#</font><font color="#992211"><b>include</b></font> <font color="#992211">&quot;SLIP_KPBC_types.h&quot;</font>
+<a name="21"><font color="#888888 "><i>   21   </i></font></a>
+<a name="22"><font color="#888888 "><i>   22   </i></font></a><font color="#117755"><i>/* Function Declarations */</i></font>
+<a name="23"><font color="#888888 "><i>   23   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_SLIP_KPBC" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_SLIP_KPBC');" target="_self"><font color="#1122aa">SLIP_KPBC</font></a>(<font color="#112266"><b>float</b></font> IMU_pitch, <font color="#112266"><b>float</b></font> Knee_joint_position, <font color="#112266"><b>float</b></font>
+<a name="24"><font color="#888888 "><i>   24   </i></font></a>                      Ankle_joint_position, <font color="#112266"><b>float</b></font> time_in, <font color="#112266"><b>float</b></font> dt, <font color="#112266"><b>float</b></font>
+<a name="25"><font color="#888888 "><i>   25   </i></font></a>                      Load_cell_x_force, <font color="#112266"><b>float</b></font> Load_cell_y_force, <font color="#112266"><b>float</b></font>
+<a name="26"><font color="#888888 "><i>   26   </i></font></a>                      Load_cell_z_force, <font color="#112266"><b>float</b></font> Load_cell_x_moment, <font color="#112266"><b>float</b></font>
+<a name="27"><font color="#888888 "><i>   27   </i></font></a>                      Load_cell_y_moment, <font color="#112266"><b>float</b></font> Load_cell_z_moment, <font color="#112266"><b>float</b></font>
+<a name="28"><font color="#888888 "><i>   28   </i></font></a>                      kp_knee, <font color="#112266"><b>float</b></font> kd_knee, <font color="#112266"><b>float</b></font> kp_ankle, <font color="#112266"><b>float</b></font> kd_ankle,
+<a name="29"><font color="#888888 "><i>   29   </i></font></a>                      <font color="#112266"><b>float</b></font> ankle_des_in, <font color="#112266"><b>float</b></font> knee_des_in, <font color="#112266"><b>float</b></font>
+<a name="30"><font color="#888888 "><i>   30   </i></font></a>                      vel_filter_coeff, <font color="#112266"><b>float</b></font> KPBC_filter_coeff, <font color="#112266"><b>float</b></font> SLIP_ON,
+<a name="31"><font color="#888888 "><i>   31   </i></font></a>                      <font color="#112266"><b>float</b></font> lt, <font color="#112266"><b>float</b></font> k, <font color="#112266"><b>float</b></font> d, <font color="#112266"><b>float</b></font> L0, <font color="#112266"><b>float</b></font> KPBC_ON, <font color="#112266"><b>float</b></font>
+<a name="32"><font color="#888888 "><i>   32   </i></font></a>                      KPBC_max_torque_rate, <font color="#112266"><b>float</b></font> pbc_gain_knee, <font color="#112266"><b>float</b></font> md, <font color="#112266"><b>float</b></font>
+<a name="33"><font color="#888888 "><i>   33   </i></font></a>                      Eref, <font color="#112266"><b>float</b></font> knee_stop_low, <font color="#112266"><b>float</b></font> knee_stop_high, <font color="#112266"><b>float</b></font>
+<a name="34"><font color="#888888 "><i>   34   </i></font></a>                      ankle_stop_low, <font color="#112266"><b>float</b></font> ankle_stop_high, <font color="#112266"><b>float</b></font> max_torque,
+<a name="35"><font color="#888888 "><i>   35   </i></font></a>                      <font color="#112266"><b>float</b></font> v0, <font color="#112266"><b>float</b></font> Fric_Comp, <font color="#112266"><b>float</b></font> F_thresh, <font color="#112266"><b>float</b></font>
+<a name="36"><font color="#888888 "><i>   36   </i></font></a>                      Command_State, <font color="#112266"><b>float</b></font> KPBC_max_torque, <font color="#112266"><b>float</b></font> Joint_Bio_Sat,
+<a name="37"><font color="#888888 "><i>   37   </i></font></a>                      <font color="#112266"><b>float</b></font> *Knee_torque_command, <font color="#112266"><b>float</b></font> *Ankle_torque_command,
+<a name="38"><font color="#888888 "><i>   38   </i></font></a>                      <font color="#112266"><b>float</b></font> *deltaL, <font color="#112266"><b>float</b></font> *hip_pos, <font color="#112266"><b>float</b></font> *Esys, <font color="#112266"><b>float</b></font>
+<a name="39"><font color="#888888 "><i>   39   </i></font></a>                      *Esys_integrate_out, <font color="#112266"><b>float</b></font> *U_S_KNEE, <font color="#112266"><b>float</b></font> *U_S_ANKLE,
+<a name="40"><font color="#888888 "><i>   40   </i></font></a>                      <font color="#112266"><b>float</b></font> *COPFX, <font color="#112266"><b>float</b></font> *U_LIN_DAMP_A, <font color="#112266"><b>float</b></font> *U_STOP_K, <font color="#112266"><b>float</b></font> *
+<a name="41"><font color="#888888 "><i>   41   </i></font></a>                      U_STOP_A, <font color="#112266"><b>float</b></font> *U_PBC_K, <font color="#112266"><b>float</b></font> *U_PBC_A, <font color="#112266"><b>float</b></font>
+<a name="42"><font color="#888888 "><i>   42   </i></font></a>                      *knee_des_out, <font color="#112266"><b>float</b></font> *ankle_des_out, <font color="#112266"><b>float</b></font> *foot_contact,
+<a name="43"><font color="#888888 "><i>   43   </i></font></a>                      <font color="#112266"><b>float</b></font> *stance, <font color="#112266"><b>float</b></font> *swing, <font color="#112266"><b>float</b></font> *phase_var_out, <font color="#112266"><b>float</b></font>
+<a name="44"><font color="#888888 "><i>   44   </i></font></a>                      *IMU_LIVE_OUT, <font color="#112266"><b>float</b></font> *StanceGain, <font color="#112266"><b>float</b></font> *SwingGain, <font color="#112266"><b>float</b></font> *
+<a name="45"><font color="#888888 "><i>   45   </i></font></a>                      knee_joint_vel, <font color="#112266"><b>float</b></font> *ankle_joint_vel, <font color="#112266"><b>float</b></font> *hip_vel,
+<a name="46"><font color="#888888 "><i>   46   </i></font></a>                      <font color="#112266"><b>float</b></font> *PushOffOut);
+<a name="47"><font color="#888888 "><i>   47   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_SLIP_KPBC_init" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_SLIP_KPBC_init');" target="_self"><font color="#1122aa">SLIP_KPBC_init</font></a>(<font color="#112266"><b>void</b></font>);
+<a name="48"><font color="#888888 "><i>   48   </i></font></a><font color="#112266"><b>extern</b></font> <font color="#112266"><b>void</b></font> <a href="SLIP_KPBC_c.html#fcn_knee_pos_prev_not_empty_init" onclick="if (top) if (top.docHiliteMe) top.docHiliteMe(window, 'fcn_knee_pos_prev_not_empty_init');" target="_self"><font color="#1122aa">knee_pos_prev_not_empty_init</font></a>(<font color="#112266"><b>void</b></font>);
+<a name="49"><font color="#888888 "><i>   49   </i></font></a>
+<a name="50"><font color="#888888 "><i>   50   </i></font></a><font color="#992211">#</font><font color="#992211"><b>endif</b></font>
+<a name="51"><font color="#888888 "><i>   51   </i></font></a>
+<a name="52"><font color="#888888 "><i>   52   </i></font></a><font color="#117755"><i>/*</i></font>
+<a name="53"><font color="#888888 "><i>   53   </i></font></a><font color="#117755"><I> * File trailer for SLIP_KPBC.h</i></font>
+<a name="54"><font color="#888888 "><i>   54   </i></font></a><font color="#117755"><I> *</i></font>
+<a name="55"><font color="#888888 "><i>   55   </i></font></a><font color="#117755"><I> * [EOF]</i></font>
+<a name="56"><font color="#888888 "><i>   56   </i></font></a><font color="#117755"><I> */</i></font>
+<a name="57"><font color="#888888 "><i>   57   </i></font></a></pre>
 </td></tr></table>
 </p>
 </body>

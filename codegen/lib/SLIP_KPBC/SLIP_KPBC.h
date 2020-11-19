@@ -5,14 +5,13 @@
  * File: SLIP_KPBC.h
  *
  * MATLAB Coder version            : 3.2
- * C/C++ source code generated on  : 01-Jul-2020 11:22:48
+ * C/C++ source code generated on  : 31-Aug-2020 12:07:22
  */
 
 #ifndef SLIP_KPBC_H
 #define SLIP_KPBC_H
 
 /* Include Files */
-#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -30,21 +29,21 @@ extern void SLIP_KPBC(float IMU_pitch, float Knee_joint_position, float
                       float ankle_des_in, float knee_des_in, float
                       vel_filter_coeff, float KPBC_filter_coeff, float SLIP_ON,
                       float lt, float k, float d, float L0, float KPBC_ON, float
-                      KPBC_max_torque_rate, float pbc_gain_knee, float M, float
+                      KPBC_max_torque_rate, float pbc_gain_knee, float md, float
                       Eref, float knee_stop_low, float knee_stop_high, float
                       ankle_stop_low, float ankle_stop_high, float max_torque,
-                      float k_tilde, float Ignore_PushOff, float F_thresh, float
+                      float v0, float Fric_Comp, float F_thresh, float
                       Command_State, float KPBC_max_torque, float Joint_Bio_Sat,
                       float *Knee_torque_command, float *Ankle_torque_command,
                       float *deltaL, float *hip_pos, float *Esys, float
-                      *Esys_integrate_out, float *U_LIN_SPRING_K, float
-                      *U_LIN_SPRING_A, float *U_LIN_DAMP_K, float *U_LIN_DAMP_A,
-                      float *U_STOP_K, float *U_STOP_A, float *U_PBC_K, float
-                      *U_PBC_A, float *knee_des_out, float *ankle_des_out, float
-                      *foot_contact, float *stance, float *swing, float
-                      *phase_var_out, float *IMU_LIVE_OUT, float *StanceGain,
-                      float *SwingGain, float *knee_joint_vel, float
-                      *ankle_joint_vel, float *hip_vel, float *PushOffOut);
+                      *Esys_integrate_out, float *U_S_KNEE, float *U_S_ANKLE,
+                      float *COPFX, float *U_LIN_DAMP_A, float *U_STOP_K, float *
+                      U_STOP_A, float *U_PBC_K, float *U_PBC_A, float
+                      *knee_des_out, float *ankle_des_out, float *foot_contact,
+                      float *stance, float *swing, float *phase_var_out, float
+                      *IMU_LIVE_OUT, float *StanceGain, float *SwingGain, float *
+                      knee_joint_vel, float *ankle_joint_vel, float *hip_vel,
+                      float *PushOffOut);
 extern void SLIP_KPBC_init(void);
 extern void knee_pos_prev_not_empty_init(void);
 

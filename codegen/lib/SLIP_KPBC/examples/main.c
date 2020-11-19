@@ -5,7 +5,7 @@
  * File: main.c
  *
  * MATLAB Coder version            : 3.2
- * C/C++ source code generated on  : 01-Jul-2020 11:22:48
+ * C/C++ source code generated on  : 31-Aug-2020 12:07:22
  */
 
 /*************************************************************************/
@@ -87,7 +87,7 @@ static void main_SLIP_KPBC(void)
   float KPBC_ON;
   float KPBC_max_torque_rate;
   float pbc_gain_knee;
-  float M;
+  float md;
   float Eref;
   float knee_stop_low;
   float Knee_torque_command;
@@ -96,9 +96,9 @@ static void main_SLIP_KPBC(void)
   float hip_pos;
   float Esys;
   float Esys_integrate_out;
-  float U_LIN_SPRING_K;
-  float U_LIN_SPRING_A;
-  float U_LIN_DAMP_K;
+  float U_S_KNEE;
+  float U_S_ANKLE;
+  float COPFX;
   float U_LIN_DAMP_A;
   float U_STOP_K;
   float U_STOP_A;
@@ -146,7 +146,7 @@ static void main_SLIP_KPBC(void)
   KPBC_ON = argInit_real32_T();
   KPBC_max_torque_rate = argInit_real32_T();
   pbc_gain_knee = argInit_real32_T();
-  M = argInit_real32_T();
+  md = argInit_real32_T();
   Eref = argInit_real32_T();
   knee_stop_low = argInit_real32_T();
 
@@ -156,16 +156,16 @@ static void main_SLIP_KPBC(void)
             Load_cell_x_moment, Load_cell_y_moment, Load_cell_z_moment, kp_knee,
             kd_knee, kp_ankle, kd_ankle, ankle_des_in, knee_des_in,
             vel_filter_coeff, KPBC_filter_coeff, SLIP_ON, lt, k, d, L0, KPBC_ON,
-            KPBC_max_torque_rate, pbc_gain_knee, M, Eref, knee_stop_low,
+            KPBC_max_torque_rate, pbc_gain_knee, md, Eref, knee_stop_low,
             argInit_real32_T(), argInit_real32_T(), argInit_real32_T(),
             argInit_real32_T(), argInit_real32_T(), argInit_real32_T(),
             argInit_real32_T(), argInit_real32_T(), argInit_real32_T(),
             argInit_real32_T(), &Knee_torque_command, &Ankle_torque_command,
-            &deltaL, &hip_pos, &Esys, &Esys_integrate_out, &U_LIN_SPRING_K,
-            &U_LIN_SPRING_A, &U_LIN_DAMP_K, &U_LIN_DAMP_A, &U_STOP_K, &U_STOP_A,
-            &U_PBC_K, &U_PBC_A, &knee_des_out, &ankle_des_out, &foot_contact,
-            &stance, &swing, &phase_var_out, &IMU_LIVE_OUT, &StanceGain,
-            &SwingGain, &knee_joint_vel, &ankle_joint_vel, &hip_vel, &PushOffOut);
+            &deltaL, &hip_pos, &Esys, &Esys_integrate_out, &U_S_KNEE, &U_S_ANKLE,
+            &COPFX, &U_LIN_DAMP_A, &U_STOP_K, &U_STOP_A, &U_PBC_K, &U_PBC_A,
+            &knee_des_out, &ankle_des_out, &foot_contact, &stance, &swing,
+            &phase_var_out, &IMU_LIVE_OUT, &StanceGain, &SwingGain,
+            &knee_joint_vel, &ankle_joint_vel, &hip_vel, &PushOffOut);
 }
 
 /*
